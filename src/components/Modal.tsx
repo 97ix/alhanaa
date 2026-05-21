@@ -8,9 +8,10 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  maxWidth?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, maxWidth }) => {
   // Prevent scrolling on body when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -56,7 +57,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
               backgroundColor: 'white',
               borderRadius: '24px',
               width: '100%',
-              maxWidth: '650px',
+              maxWidth: maxWidth || '650px',
               padding: '32px',
               boxShadow: '0 30px 60px -12px rgba(0,0,0,0.4)',
               position: 'relative',

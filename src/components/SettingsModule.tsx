@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, User, Globe, Download, Upload, Trash2 } from 'lucide-react';
+import { Save, User, Globe, Download, Upload, Trash2, Key } from 'lucide-react';
 import { getDb, closeDb } from '../lib/db';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { copyFile } from '@tauri-apps/plugin-fs';
@@ -12,6 +12,7 @@ export const SettingsModule = () => {
   const [taxRate, setTaxRate] = useState("15");
   const [userName, setUserName] = useState("د. أنس ثورن");
   const [userRole, setUserRole] = useState("صيدلي رئيسي");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resetConfirmInput, setResetConfirmInput] = useState("");
@@ -40,6 +41,7 @@ export const SettingsModule = () => {
             if (s.key === 'pharmacy_phone') setPhone(s.value);
             if (s.key === 'user_name') setUserName(s.value);
             if (s.key === 'user_role') setUserRole(s.value);
+            if (s.key === 'gemini_api_key') setGeminiApiKey(s.value || "");
         });
     };
     fetchSettings();
@@ -53,6 +55,7 @@ export const SettingsModule = () => {
     await db.execute("UPDATE app_settings SET value = $1 WHERE key = 'pharmacy_phone'", [phone]);
     await db.execute("UPDATE app_settings SET value = $1 WHERE key = 'user_name'", [userName]);
     await db.execute("UPDATE app_settings SET value = $1 WHERE key = 'user_role'", [userRole]);
+    await db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('gemini_api_key', $1)", [geminiApiKey]);
     
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
@@ -234,6 +237,26 @@ export const SettingsModule = () => {
                 className="input" style={{ width: '100%', background: '#f2f4f6', border: 'none', height: '40px' }}
                 value={userRole} onChange={e => setUserRole(e.target.value)}
               />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 800 }}>
+            <Key size={20} color="var(--primary)" /> إعدادات الذكاء الاصطناعي (Gemini API)
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>مفتاح Gemini API Key</label>
+              <input 
+                type="password"
+                placeholder="AIzaSy..." 
+                className="input" style={{ width: '100%', background: '#f2f4f6', border: 'none', height: '48px', fontFamily: 'monospace' }}
+                value={geminiApiKey} onChange={e => setGeminiApiKey(e.target.value)}
+              />
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+                * يُستخدم هذا المفتاح لتحليل صور قوائم الأدوية والفواتير آلياً باستخدام نموذج Gemini Flash. يتم حفظ المفتاح محلياً على جهازك فقط بشكل آمن.
+              </p>
             </div>
           </div>
         </div>

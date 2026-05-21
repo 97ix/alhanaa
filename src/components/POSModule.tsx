@@ -28,6 +28,8 @@ export const POSModule = ({ cart, setCart, customerName, setCustomerName }: POSP
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [amountPaid, setAmountPaid] = useState<number>(0);
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const paymentMethod = (selectedCustomerId || customerName.trim()) ? 'credit' : 'cash';
 
   useEffect(() => {
@@ -62,7 +64,8 @@ export const POSModule = ({ cart, setCart, customerName, setCustomerName }: POSP
   };
 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && searchQuery) {
+    const rawVal = e.currentTarget.value.trim();
+    if (e.key === 'Enter' && rawVal) {
       const db = await getDb();
       // Try exact barcode match first
       const result = await db.select<Medicine[]>(
@@ -71,7 +74,7 @@ export const POSModule = ({ cart, setCart, customerName, setCustomerName }: POSP
          COALESCE((SELECT mb.expiry_date FROM medicine_batches mb WHERE mb.medicine_id = m.id AND mb.quantity > 0 ORDER BY mb.expiry_date ASC LIMIT 1), m.expiry_date) as expiry_date
          FROM medicines m 
          WHERE (m.barcode = $1 OR m.name = $1 OR m.scientific_name = $1) AND m.stock > 0 LIMIT 1`,
-        [searchQuery]
+        [rawVal]
       );
       
       if (result.length > 0) {
@@ -83,7 +86,10 @@ export const POSModule = ({ cart, setCart, customerName, setCustomerName }: POSP
   };
 
   useEffect(() => {
-    searchMedicines(searchQuery);
+    const timer = setTimeout(() => {
+      searchMedicines(searchQuery);
+    }, 150); // 150ms debounce to prevent SQLite lockups & input lag from fast barcode scanners
+    return () => clearTimeout(timer);
   }, [searchQuery]);
 
   const calculateLineTotal = async (medicineId: number, qty: number, basePrice: number) => {
@@ -244,6 +250,18 @@ export const POSModule = ({ cart, setCart, customerName, setCustomerName }: POSP
       if (e.key === 'F3') {
         e.preventDefault();
         handleCheckoutRef.current();
+        return;
+      }
+
+      // Automatically focus search input when user types any alphanumeric/symbol character outside forms
+      const active = document.activeElement;
+      const isInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT');
+      
+      if (!isInput && searchInputRef.current) {
+        // Alphanumeric characters, digits, common symbols (single character keys, not hotkeys)
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          searchInputRef.current.focus();
+        }
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -261,6 +279,7 @@ export const POSModule = ({ cart, setCart, customerName, setCustomerName }: POSP
           <div style={{ position: 'relative' }}>
             <Search size={20} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-slate)' }} />
             <input 
+              ref={searchInputRef}
               className="search-input" 
               placeholder="ابحث عن الدواء بالاسم أو الباركود..." 
               style={{ width: '100%', paddingRight: '44px', height: '56px', fontSize: '1rem', background: '#f2f4f6' }}
