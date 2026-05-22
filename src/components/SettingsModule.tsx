@@ -3,7 +3,7 @@ import { Save, User, Globe, Download, Upload, Trash2, Key } from 'lucide-react';
 import { getDb, closeDb } from '../lib/db';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { copyFile } from '@tauri-apps/plugin-fs';
-import { appLocalDataDir, join } from '@tauri-apps/api/path';
+import { appConfigDir, join } from '@tauri-apps/api/path';
 
 export const SettingsModule = () => {
   const [pharmacyName, setPharmacyName] = useState("صيدلية الهناء");
@@ -64,7 +64,7 @@ export const SettingsModule = () => {
   const handleBackup = async () => {
     try {
       await closeDb();
-      const dataDir = await appLocalDataDir();
+      const dataDir = await appConfigDir();
       const dbPath = await join(dataDir, 'pharmacy.db');
       
       const destination = await save({
@@ -98,7 +98,7 @@ export const SettingsModule = () => {
 
       if (selected && !Array.isArray(selected)) {
         await closeDb();
-        const dataDir = await appLocalDataDir();
+        const dataDir = await appConfigDir();
         const dbPath = await join(dataDir, 'pharmacy.db');
         await copyFile(selected, dbPath);
         
