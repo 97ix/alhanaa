@@ -5,6 +5,27 @@ import { Medicine, Category } from '../types';
 import { Modal } from './Modal';
 import { CameraScanner } from './CameraScanner';
 
+// Helper functions for cleaning and parsing Arabic/Indic and Western numbers
+const convertArabicNumerals = (val: any): string => {
+  if (val === null || val === undefined) return "";
+  let str = val.toString();
+  // Arabic-Indic digits (U+0660 to U+0669)
+  str = str.replace(/[\u0660-\u0669]/g, (d: string) => (d.charCodeAt(0) - 1632).toString());
+  // Eastern Arabic/Persian/Urdu digits (U+06F0 to U+06F9)
+  str = str.replace(/[\u06F0-\u06F9]/g, (d: string) => (d.charCodeAt(0) - 1776).toString());
+  return str;
+};
+
+const parseCleanNumber = (val: any): number => {
+  const cleaned = convertArabicNumerals(val).replace(/[^0-9.]/g, '');
+  return parseFloat(cleaned) || 0;
+};
+
+const parseCleanInt = (val: any): number => {
+  const cleaned = convertArabicNumerals(val).replace(/[^0-9]/g, '');
+  return parseInt(cleaned) || 0;
+};
+
 // Sub-component for the Add/Edit form to isolate state updates
 const MedicineForm = ({ 
   initialData, 
@@ -314,8 +335,7 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
   const [isAIScanning, setIsAIScanning] = useState(false);
   const [aiApiKey, setAiApiKey] = useState("");
   const [aiError, setAiError] = useState("");
-  const [scannedImage, setScannedImage] = useState<string | null>(null);
-  const [scannedImageName, setScannedImageName] = useState("");
+  const [scannedImages, setScannedImages] = useState<{ id: string; name: string; dataUrl: string }[]>([]);
   const [extractedItems, setExtractedItems] = useState<any[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [toastNotification, setToastNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -369,6 +389,26 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
     }, 4000);
   };
 
+  const sanitizeBarcode = (val: any): string | null => {
+    if (!val) return null;
+    const str = val.toString().trim();
+    if (!str) return null;
+    
+    const lower = str.toLowerCase();
+    if (
+      lower === "null" ||
+      lower === "none" ||
+      lower === "n/a" ||
+      lower === "na" ||
+      lower === "nil" ||
+      lower === "-" ||
+      lower === "undefined"
+    ) {
+      return null;
+    }
+    return str;
+  };
+
   const saveModalApiKey = async (key: string) => {
     if (!key.trim()) return;
     const db = await getDb();
@@ -377,15 +417,32 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
     showToast("تم حفظ مفتاح Gemini API بنجاح!", "success");
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setScannedImageName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setScannedImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const readFilesAsDataURLs = async (files: FileList): Promise<{ id: string; name: string; dataUrl: string }[]> => {
+    const promises = Array.from(files).map(file => {
+      return new Promise<{ id: string; name: string; dataUrl: string }>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve({
+            id: Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+            name: file.name,
+            dataUrl: reader.result as string
+          });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    });
+    return Promise.all(promises);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      try {
+        const newImages = await readFilesAsDataURLs(e.target.files);
+        setScannedImages(prev => [...prev, ...newImages]);
+      } catch (err) {
+        console.error("Error reading files:", err);
+      }
     }
   };
 
@@ -399,24 +456,23 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      setScannedImageName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setScannedImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      try {
+        const newImages = await readFilesAsDataURLs(e.dataTransfer.files);
+        setScannedImages(prev => [...prev, ...newImages]);
+      } catch (err) {
+        console.error("Error reading dropped files:", err);
+      }
     }
   };
 
   const startAIScan = async () => {
-    if (!scannedImage) {
-      setAiError("يرجى اختيار أو سحب صورة أولاً");
+    if (scannedImages.length === 0) {
+      setAiError("يرجى اختيار أو سحب صورة واحدة على الأقل");
       return;
     }
     if (!aiApiKey.trim()) {
@@ -429,27 +485,16 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
     setExtractedItems([]);
 
     try {
-      const base64Data = scannedImage.split(',')[1];
-      const mimeType = scannedImage.split(';')[0].split(':')[1];
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${aiApiKey}`;
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `Analyze this pharmacy invoice/medicine list image. Extract all medicines into a structured JSON array. 
+      const parts: any[] = [
+        {
+          text: `Analyze these pharmacy invoice/medicine list images. Extract all medicines across all these images into a single structured JSON array, merging items if appropriate.
 Rules:
 1. 'name': MUST be the English medicine brand name ONLY (e.g. "Panadol Extra", "Amoxil 500mg"). Do NOT translate to Arabic. Get it from the item name column.
 2. 'barcode': Barcode/UPC/EAN string if visible in the image or list (e.g. "6223002640123"). If no barcode is visible or present, return "".
 3. 'quantity': Quantity or count (العدد) of items.
-4. 'purchase_price': Purchase price (سعر الشراء للقطعة الواحدة) for a SINGLE item from the price column. If only total price is given, divide it by quantity to get single piece cost. Return as a plain number.
-5. 'expiry_date': Expiry date. Try to format as YYYY-MM-DD. If only MM/YYYY is present, format as YYYY-MM-01.
+4. 'total_price': The total price (السعر الإجمالي للكمية كاملة) for this line item in the invoice. Return as a plain number. If only unit price is given, calculate total price as purchase_price * quantity.
+5. 'purchase_price': Purchase price (سعر الشراء للقطعة الواحدة) for a SINGLE item from the price column. If only total price is given, divide it by quantity to get single piece cost. Return as a plain number.
+6. 'expiry_date': Expiry date. Try to format as YYYY-MM-DD. If only MM/YYYY is present, format as YYYY-MM-01.
 
 Return JSON in this format:
 {
@@ -458,50 +503,106 @@ Return JSON in this format:
       "name": "Panadol Extra",
       "barcode": "6223002640123",
       "quantity": 10,
+      "total_price": 12000,
       "purchase_price": 1200,
       "expiry_date": "2027-05-01"
     }
   ]
 }`
-                },
+        }
+      ];
+
+      // Append each scanned image to the parts array
+      for (const img of scannedImages) {
+        const base64Data = img.dataUrl.split(',')[1];
+        const mimeType = img.dataUrl.split(';')[0].split(':')[1];
+        parts.push({
+          inlineData: {
+            mimeType: mimeType,
+            data: base64Data
+          }
+        });
+      }
+
+      let response: Response | undefined;
+      let lastError = "";
+      const model = "gemini-2.5-flash";
+      let attempts = 5;
+      let delayMs = 1500;
+
+      while (attempts > 0) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${aiApiKey}`;
+          response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              contents: [
                 {
-                  inlineData: {
-                    mimeType: mimeType,
-                    data: base64Data
-                  }
+                  parts: parts
                 }
-              ]
-            }
-          ],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                items: {
-                  type: "ARRAY",
-                  items: {
-                    type: "OBJECT",
-                    properties: {
-                      name: { type: "STRING" },
-                      barcode: { type: "STRING" },
-                      quantity: { type: "INTEGER" },
-                      purchase_price: { type: "NUMBER" },
-                      expiry_date: { type: "STRING" }
-                    },
-                    required: ["name", "barcode", "quantity", "purchase_price", "expiry_date"]
-                  }
+              ],
+              generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: "OBJECT",
+                  properties: {
+                    items: {
+                      type: "ARRAY",
+                      items: {
+                        type: "OBJECT",
+                        properties: {
+                          name: { type: "STRING" },
+                          barcode: { type: "STRING" },
+                          quantity: { type: "INTEGER" },
+                          total_price: { type: "NUMBER" },
+                          purchase_price: { type: "NUMBER" },
+                          expiry_date: { type: "STRING" }
+                        },
+                        required: ["name", "barcode", "quantity", "total_price", "purchase_price", "expiry_date"]
+                      }
+                    }
+                  },
+                  required: ["items"]
                 }
-              },
-              required: ["items"]
+              }
+            })
+          });
+
+          if (response.ok) {
+            break;
+          }
+
+          const errorData = await response.json().catch(() => ({}));
+          const errMsg = errorData.error?.message || `API Error: ${response.status}`;
+          lastError = errMsg;
+
+          const isRetriable = response.status === 429 || response.status === 503 || response.status >= 500 || errMsg.toLowerCase().includes("high demand") || errMsg.toLowerCase().includes("quota");
+          if (isRetriable) {
+            attempts--;
+            if (attempts > 0) {
+              await new Promise(resolve => setTimeout(resolve, delayMs));
+              delayMs *= 2;
+              continue;
             }
           }
-        })
-      });
+          break;
+        } catch (err: any) {
+          lastError = err?.message || String(err);
+          attempts--;
+          if (attempts > 0) {
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            delayMs *= 2;
+            continue;
+          }
+          break;
+        }
+      }
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+      if (!response || !response.ok) {
+        throw new Error(lastError || "فشل الاتصال بخوادم الذكاء الاصطناعي. يرجى المحاولة مرة أخرى لاحقاً.");
       }
 
       const resJson = await response.json();
@@ -515,22 +616,32 @@ Return JSON in this format:
         throw new Error("تنسيق الاستجابة غير صحيح");
       }
 
-      const defaultCatId = categories.length > 0 ? categories[0].id : 0;
+      const generalCat = categories.find(c => c.name.toLowerCase() === 'general' || c.name === 'جيرال');
+      const defaultCatId = generalCat ? generalCat.id : (categories.length > 0 ? categories[0].id : 0);
       
-      const mappedItems = parsed.items.map((item: any, index: number) => ({
-        tempId: index,
-        name: item.name || "",
-        barcode: item.barcode || "",
-        quantity: item.quantity || 0,
-        purchase_price: item.purchase_price || 0,
-        expiry_date: item.expiry_date || "",
-        category_id: defaultCatId
-      }));
+      const mappedItems = parsed.items.map((item: any, index: number) => {
+        const qty = parseCleanInt(item.quantity);
+        const purchasePrice = parseCleanNumber(item.purchase_price);
+        const totalPrice = parseCleanNumber(item.total_price) || (purchasePrice * qty);
+        const finalPurchasePrice = purchasePrice || (qty > 0 ? totalPrice / qty : 0);
+
+        return {
+          tempId: index,
+          name: item.name || "",
+          barcode: item.barcode || "",
+          quantity: qty,
+          purchase_price: Math.round(finalPurchasePrice),
+          total_price: Math.round(totalPrice),
+          expiry_date: item.expiry_date || "",
+          category_id: defaultCatId
+        };
+      });
 
       setExtractedItems(mappedItems);
     } catch (err: any) {
       console.error(err);
-      setAiError(err.message || "فشل تحليل الصورة. يرجى التحقق من مفتاح API أو جودة الصورة.");
+      const errMsg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      setAiError(errMsg || "فشل تحليل الصورة. يرجى التحقق من مفتاح API أو جودة الصورة.");
     } finally {
       setIsAIScanning(false);
     }
@@ -542,63 +653,89 @@ Return JSON in this format:
 
     try {
       for (const item of extractedItems) {
-        if (!item.name || item.quantity <= 0 || !item.expiry_date) {
+        const nameVal = item.name ? item.name.toString().trim() : "";
+        const quantityCleaned = item.quantity ? item.quantity.toString().replace(/[^0-9]/g, '') : '';
+        const quantityVal = parseInt(quantityCleaned) || 0;
+        const purchasePriceCleaned = item.purchase_price ? item.purchase_price.toString().replace(/[^0-9.]/g, '') : '';
+        const purchasePriceVal = parseFloat(purchasePriceCleaned) || 0;
+        const expiryDateVal = item.expiry_date ? item.expiry_date.toString().trim() : "";
+        const barcodeVal = sanitizeBarcode(item.barcode);
+
+        if (!nameVal || quantityVal <= 0 || !expiryDateVal) {
           continue;
         }
 
-        const existing = await db.select<any[]>("SELECT * FROM medicines WHERE LOWER(name) = $1", [item.name.toLowerCase()]);
-        const taxRate = existing.length > 0 && existing[0].tax_rate !== null ? existing[0].tax_rate : appTaxRate;
-        const sellingPrice = Math.round(item.purchase_price * (1 + taxRate / 100));
+        // Highly robust lookup logic to prevent UNIQUE constraint failures on barcode:
+        // 1. Look up by barcode first if it exists
+        // 2. Fall back to name matching
+        let existingMed: any = null;
+        if (barcodeVal) {
+          const byBarcode = await db.select<any[]>("SELECT * FROM medicines WHERE barcode = $1", [barcodeVal]);
+          if (byBarcode.length > 0) {
+            existingMed = byBarcode[0];
+          }
+        }
+        if (!existingMed) {
+          const byName = await db.select<any[]>("SELECT * FROM medicines WHERE LOWER(name) = $1", [nameVal.toLowerCase()]);
+          if (byName.length > 0) {
+            existingMed = byName[0];
+          }
+        }
 
-        if (existing.length > 0) {
-          const medId = existing[0].id;
-          const existingBarcode = existing[0].barcode;
+        const taxRate = existingMed && existingMed.tax_rate !== null ? existingMed.tax_rate : appTaxRate;
+        const sellingPrice = Math.round(purchasePriceVal * (1 + taxRate / 100));
+
+        if (existingMed) {
+          const medId = existingMed.id;
+          const existingBarcode = existingMed.barcode;
+          const existingBarcodeStr = existingBarcode ? String(existingBarcode).trim() : "";
           
           await db.execute(
             "INSERT INTO medicine_batches (medicine_id, quantity, expiry_date, purchase_price, selling_price) VALUES ($1, $2, $3, $4, $5)",
-            [medId, item.quantity, item.expiry_date, item.purchase_price, sellingPrice]
+            [medId, quantityVal, expiryDateVal, purchasePriceVal, sellingPrice]
           );
 
-          if ((!existingBarcode || existingBarcode.trim() === "") && item.barcode && item.barcode.trim() !== "") {
+          if (!existingBarcodeStr && barcodeVal) {
             await db.execute(
               "UPDATE medicines SET stock = stock + $1, purchase_price = $2, price = $3, barcode = $5 WHERE id = $4",
-              [item.quantity, item.purchase_price, sellingPrice, medId, item.barcode.trim()]
+              [quantityVal, purchasePriceVal, sellingPrice, medId, barcodeVal]
             );
           } else {
             await db.execute(
               "UPDATE medicines SET stock = stock + $1, purchase_price = $2, price = $3 WHERE id = $4",
-              [item.quantity, item.purchase_price, sellingPrice, medId]
+              [quantityVal, purchasePriceVal, sellingPrice, medId]
             );
           }
         } else {
           const result = await db.execute(
             "INSERT INTO medicines (name, category_id, stock, price, expiry_date, purchase_price, min_stock_level, barcode) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-            [item.name, item.category_id, item.quantity, sellingPrice, item.expiry_date, item.purchase_price, 5, item.barcode || ""]
+            [nameVal, item.category_id, quantityVal, sellingPrice, expiryDateVal, purchasePriceVal, 5, barcodeVal]
           );
           
           const newMedId = result.lastInsertId;
 
           await db.execute(
             "INSERT INTO medicine_batches (medicine_id, quantity, expiry_date, purchase_price, selling_price) VALUES ($1, $2, $3, $4, $5)",
-            [newMedId, item.quantity, item.expiry_date, item.purchase_price, sellingPrice]
+            [newMedId, quantityVal, expiryDateVal, purchasePriceVal, sellingPrice]
           );
         }
       }
 
       setIsAIModalOpen(false);
       setExtractedItems([]);
-      setScannedImage(null);
-      setScannedImageName("");
+      setScannedImages([]);
       showToast("تمت إضافة قائمة الأدوية بنجاح إلى المخزون!", "success");
       fetchInventory();
     } catch (err: any) {
       console.error(err);
-      showToast("حدث خطأ أثناء حفظ الأدوية في قاعدة البيانات: " + err.message, "error");
+      const errMsg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      showToast("حدث خطأ أثناء حفظ الأدوية في قاعدة البيانات: " + errMsg, "error");
     }
   };
 
   const addBlankExtractedItem = () => {
-    const defaultCatId = categories.length > 0 ? categories[0].id : 0;
+    const generalCat = categories.find(c => c.name.toLowerCase() === 'general' || c.name === 'جيرال');
+    const defaultCatId = generalCat ? generalCat.id : (categories.length > 0 ? categories[0].id : 0);
     setExtractedItems(prev => [
       ...prev,
       {
@@ -607,6 +744,7 @@ Return JSON in this format:
         barcode: "",
         quantity: 1,
         purchase_price: 0,
+        total_price: 0,
         expiry_date: new Date().toISOString().split('T')[0],
         category_id: defaultCatId
       }
@@ -717,9 +855,9 @@ Return JSON in this format:
                 <tr>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '130px' }}>الباركود</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>اسم الدواء (إنجليزي)</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>الفئة</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '80px' }}>الكمية</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '100px' }}>سعر الشراء (د.ع)</th>
+                  <th style={{ padding: '12px 6px', textAlign: 'center', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '60px' }}>الكمية</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '95px' }}>السعر الإجمالي (د.ع)</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '95px' }}>سعر الشراء للقطعة</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '140px' }}>تاريخ الصلاحية</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '130px' }}>سعر البيع المقدر</th>
                   <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '60px' }}>حذف</th>
@@ -728,7 +866,8 @@ Return JSON in this format:
               <tbody>
                 {extractedItems.map((item, idx) => {
                   const rate = appTaxRate;
-                  const estimatedSalePrice = Math.round(item.purchase_price * (1 + rate / 100));
+                  const purchasePriceNum = parseCleanNumber(item.purchase_price);
+                  const estimatedSalePrice = Math.round(purchasePriceNum * (1 + rate / 100));
 
                   return (
                     <tr key={item.tempId || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -773,46 +912,77 @@ Return JSON in this format:
                           placeholder="Brand Name"
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <select 
-                          className="input"
-                          style={{ width: '100%', height: '38px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem', padding: '0 8px' }}
-                          value={item.category_id}
-                          onChange={e => {
-                            const updated = [...extractedItems];
-                            updated[idx].category_id = parseInt(e.target.value);
-                            setExtractedItems(updated);
-                          }}
-                        >
-                          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </td>
-                      <td style={{ padding: '8px 12px' }}>
+
+                      <td style={{ padding: '8px 6px' }}>
                         <input 
-                          type="number"
-                          min="1"
+                          type="text"
                           className="input"
-                          style={{ width: '100%', height: '38px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem' }}
-                          value={item.quantity}
+                          style={{ width: '100%', height: '38px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem', textAlign: 'center' }}
+                          value={item.quantity === 0 ? "" : item.quantity}
                           onChange={e => {
+                            const valStr = e.target.value;
+                            const qty = parseCleanInt(valStr);
+                            
                             const updated = [...extractedItems];
-                            updated[idx].quantity = parseInt(e.target.value) || 0;
+                            updated[idx].quantity = valStr;
+                            
+                            // Re-calculate unit purchase price or total price based on what's available
+                            const tp = parseCleanNumber(item.total_price);
+                            const pp = parseCleanNumber(item.purchase_price);
+                            
+                            if (qty > 0) {
+                              if (tp > 0) {
+                                updated[idx].purchase_price = Math.round(tp / qty);
+                              } else if (pp > 0) {
+                                updated[idx].total_price = Math.round(pp * qty);
+                              }
+                            }
                             setExtractedItems(updated);
                           }}
                         />
                       </td>
                       <td style={{ padding: '8px 12px' }}>
                         <input 
-                          type="number"
-                          min="0"
+                          type="text"
                           className="input"
                           style={{ width: '100%', height: '38px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem' }}
-                          value={item.purchase_price}
+                          value={item.total_price === 0 ? "" : item.total_price}
                           onChange={e => {
+                            const valStr = e.target.value;
+                            const tp = parseCleanNumber(valStr);
+                            
                             const updated = [...extractedItems];
-                            updated[idx].purchase_price = parseFloat(e.target.value) || 0;
+                            updated[idx].total_price = valStr;
+                            
+                            // Re-calculate unit purchase price
+                            const qty = parseCleanInt(item.quantity);
+                            if (qty > 0) {
+                              updated[idx].purchase_price = Math.round(tp / qty);
+                            }
                             setExtractedItems(updated);
                           }}
+                          placeholder="الإجمالي"
+                        />
+                      </td>
+                      <td style={{ padding: '8px 12px' }}>
+                        <input 
+                          type="text"
+                          className="input"
+                          style={{ width: '100%', height: '38px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.85rem' }}
+                          value={item.purchase_price === 0 ? "" : item.purchase_price}
+                          onChange={e => {
+                            const valStr = e.target.value;
+                            const pp = parseCleanNumber(valStr);
+                            
+                            const updated = [...extractedItems];
+                            updated[idx].purchase_price = valStr;
+                            
+                            // Re-calculate total price
+                            const qty = parseCleanInt(item.quantity);
+                            updated[idx].total_price = Math.round(pp * qty);
+                            setExtractedItems(updated);
+                          }}
+                          placeholder="سعر القطعة"
                         />
                       </td>
                       <td style={{ padding: '8px 12px' }}>
@@ -860,8 +1030,7 @@ Return JSON in this format:
               style={{ flex: 1, height: '48px', justifyContent: 'center', background: '#f1f5f9', borderRadius: '12px', color: 'var(--text-slate)' }}
               onClick={() => {
                 setExtractedItems([]);
-                setScannedImage(null);
-                setScannedImageName("");
+                setScannedImages([]);
               }}
             >
               إعادة الرفع
@@ -900,7 +1069,7 @@ Return JSON in this format:
           </div>
         )}
 
-        {!scannedImage ? (
+        {scannedImages.length === 0 ? (
           <div 
             onDragEnter={handleDrag}
             onDragOver={handleDrag}
@@ -934,6 +1103,7 @@ Return JSON in this format:
             <input 
               id="ai-file-uploader" 
               type="file" 
+              multiple
               accept="image/*" 
               onChange={handleFileChange} 
               style={{ display: 'none' }} 
@@ -951,40 +1121,111 @@ Return JSON in this format:
               <Upload size={28} />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>اسحب وأسقط صورة قائمة الأدوية هنا</p>
-              <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>أو انقر هنا لاختيار ملف من جهازك</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>اسحب وأسقط صور قوائم الأدوية هنا</p>
+              <p style={{ margin: '6px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>أو انقر هنا لاختيار ملفات من جهازك</p>
             </div>
-            <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>يدعم صيغ الصور (PNG, JPG, JPEG, WEBP)</p>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>يدعم تحديد عدة صور معاً (PNG, JPG, JPEG, WEBP)</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc', padding: '20px', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <img 
-                  src={scannedImage} 
-                  alt="Scanned Preview" 
-                  style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', border: '1px solid #cbd5e1' }} 
-                />
-                <div>
-                  <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9rem', color: '#1e293b', wordBreak: 'break-all' }}>{scannedImageName}</p>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>جاهز للتحليل بالذكاء الاصطناعي</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <input 
+              id="ai-file-uploader" 
+              type="file" 
+              multiple
+              accept="image/*" 
+              onChange={handleFileChange} 
+              style={{ display: 'none' }} 
+            />
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', 
+              gap: '16px', 
+              background: '#f8fafc', 
+              padding: '20px', 
+              borderRadius: '20px', 
+              border: '1px solid #e2e8f0',
+              maxHeight: '360px',
+              overflowY: 'auto'
+            }}>
+              {scannedImages.map((img) => (
+                <div key={img.id} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px', background: 'white', padding: '8px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                  <div style={{ position: 'relative', width: '100%', height: '100px', borderRadius: '8px', overflow: 'hidden' }}>
+                    <img 
+                      src={img.dataUrl} 
+                      alt={img.name} 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                    />
+                    <button 
+                      type="button"
+                      className="btn-icon" 
+                      style={{ 
+                        position: 'absolute', 
+                        top: '4px', 
+                        right: '4px', 
+                        background: 'rgba(239, 68, 68, 0.9)', 
+                        color: 'white', 
+                        border: 'none', 
+                        cursor: 'pointer', 
+                        borderRadius: '50%', 
+                        width: '24px', 
+                        height: '24px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        transition: 'all 0.2s'
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setScannedImages(prev => prev.filter(x => x.id !== img.id));
+                      }}
+                      onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                      onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 600, color: '#334155', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'center', direction: 'ltr' }} title={img.name}>
+                    {img.name}
+                  </p>
                 </div>
-              </div>
-              <button 
-                className="btn-icon" 
-                style={{ background: '#f1f5f9', color: '#ef4444', border: 'none', cursor: 'pointer', borderRadius: '10px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                onClick={() => { setScannedImage(null); setScannedImageName(""); }}
+              ))}
+
+              <div 
+                onClick={() => document.getElementById('ai-file-uploader')?.click()}
+                style={{ 
+                  border: '2px dashed #cbd5e1', 
+                  borderRadius: '14px', 
+                  height: '142px', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  cursor: 'pointer', 
+                  transition: 'all 0.2s', 
+                  background: 'white',
+                  gap: '8px'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--primary)';
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.01)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                  e.currentTarget.style.background = 'white';
+                }}
               >
-                <X size={18} />
-              </button>
+                <Plus size={20} style={{ color: '#64748b' }} />
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>إضافة المزيد</span>
+              </div>
             </div>
 
             <button 
               className="btn btn-primary" 
-              style={{ height: '48px', justifyContent: 'center', borderRadius: '12px', width: '100%', gap: '8px' }}
+              style={{ height: '48px', justifyContent: 'center', borderRadius: '12px', width: '100%', gap: '8px', marginTop: '8px' }}
               onClick={startAIScan}
             >
-              <Sparkles size={18} /> بدء استخراج البيانات بالذكاء الاصطناعي
+              <Sparkles size={18} /> بدء استخراج البيانات بالذكاء الاصطناعي ({scannedImages.length} قائمة/قوائم)
             </button>
           </div>
         )}
@@ -994,17 +1235,19 @@ Return JSON in this format:
 
   const handleFormSubmit = async (formData: any) => {
     const db = await getDb();
+    const barcodeVal = sanitizeBarcode(formData.barcode);
+
     if (editingMedicine) {
       await db.execute(
         "UPDATE medicines SET name = $1, category_id = $2, stock = $3, price = $4, barcode = $5, expiry_date = $6, description = $7, tax_rate = $8, scientific_name = $9, min_stock_level = $10, purchase_price = $11 WHERE id = $12",
-        [formData.name, formData.category_id, formData.stock, formData.price, formData.barcode, formData.expiry_date, formData.description, formData.tax_rate, formData.scientific_name, formData.min_stock_level, formData.purchase_price, editingMedicine.id]
+        [formData.name, formData.category_id, formData.stock, formData.price, barcodeVal, formData.expiry_date, formData.description, formData.tax_rate, formData.scientific_name, formData.min_stock_level, formData.purchase_price, editingMedicine.id]
       );
       // Optional: Update the oldest active batch if it's a simple edit? 
       // For now, simple editing updates the summary.
     } else {
       const result = await db.execute(
         "INSERT INTO medicines (name, category_id, stock, price, barcode, expiry_date, description, tax_rate, scientific_name, min_stock_level, purchase_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
-        [formData.name, formData.category_id, formData.stock, formData.price, formData.barcode, formData.expiry_date, formData.description, formData.tax_rate, formData.scientific_name, formData.min_stock_level, formData.purchase_price]
+        [formData.name, formData.category_id, formData.stock, formData.price, barcodeVal, formData.expiry_date, formData.description, formData.tax_rate, formData.scientific_name, formData.min_stock_level, formData.purchase_price]
       );
       const medicineId = result.lastInsertId;
       
@@ -1022,9 +1265,11 @@ Return JSON in this format:
   };
 
   const filteredMedicines = medicines.filter(m => {
-    const matchesSearch = m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      m.scientific_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.barcode?.toLowerCase().includes(searchQuery.toLowerCase());
+    const cleanQuery = searchQuery.trim().toLowerCase();
+    const barcodeStr = (m.barcode && m.barcode.trim()) ? m.barcode.toLowerCase() : 'none';
+    const matchesSearch = m.name.toLowerCase().includes(cleanQuery) || 
+      m.scientific_name?.toLowerCase().includes(cleanQuery) ||
+      barcodeStr.includes(cleanQuery);
     
     if (activeFilter === 'expired') {
       const expiry = new Date(m.expiry_date);
@@ -1040,6 +1285,20 @@ Return JSON in this format:
     return matchesSearch;
   });
 
+  const totalAllCount = medicines.length;
+  
+  const totalLowStockCount = medicines.filter(
+    m => m.stock <= (m.min_stock_level || 5)
+  ).length;
+
+  const totalExpiredCount = medicines.filter(m => {
+    if (!m.expiry_date) return false;
+    const expiry = new Date(m.expiry_date);
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    return expiry < thirtyDaysFromNow;
+  }).length;
+
   return (
     <div className="fade-in">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -1051,19 +1310,87 @@ Return JSON in this format:
           <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', marginRight: '12px' }}>
             <button 
               className={`btn ${activeFilter === '' ? 'btn-primary' : ''}`} 
-              style={{ background: activeFilter === '' ? 'var(--primary)' : 'transparent', color: activeFilter === '' ? 'white' : 'var(--text-slate)', padding: '8px 16px', fontSize: '0.8rem' }}
+              style={{ 
+                background: activeFilter === '' ? 'var(--primary)' : 'transparent', 
+                color: activeFilter === '' ? 'white' : 'var(--text-slate)', 
+                padding: '8px 16px', 
+                fontSize: '0.8rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
               onClick={() => setActiveFilter('')}
-            >الكل</button>
+            >
+              <span>الكل</span>
+              <span style={{ 
+                background: activeFilter === '' ? 'rgba(255, 255, 255, 0.22)' : '#e2e8f0', 
+                color: activeFilter === '' ? 'white' : '#475569', 
+                padding: '2px 8px', 
+                borderRadius: '20px', 
+                fontSize: '0.75rem', 
+                fontWeight: 600 
+              }}>
+                {totalAllCount}
+              </span>
+            </button>
             <button 
               className={`btn ${activeFilter === 'low_stock' ? 'btn-primary' : ''}`} 
-              style={{ background: activeFilter === 'low_stock' ? 'var(--primary)' : 'transparent', color: activeFilter === 'low_stock' ? 'white' : 'var(--text-slate)', padding: '8px 16px', fontSize: '0.8rem' }}
+              style={{ 
+                background: activeFilter === 'low_stock' ? 'var(--primary)' : 'transparent', 
+                color: activeFilter === 'low_stock' ? 'white' : 'var(--text-slate)', 
+                padding: '8px 16px', 
+                fontSize: '0.8rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
               onClick={() => setActiveFilter('low_stock')}
-            >النواقص</button>
+            >
+              <span>النواقص</span>
+              <span style={{ 
+                background: activeFilter === 'low_stock' 
+                  ? 'rgba(255, 255, 255, 0.22)' 
+                  : (totalLowStockCount > 0 ? '#fee2e2' : '#e2e8f0'), 
+                color: activeFilter === 'low_stock' 
+                  ? 'white' 
+                  : (totalLowStockCount > 0 ? '#ef4444' : '#475569'), 
+                padding: '2px 8px', 
+                borderRadius: '20px', 
+                fontSize: '0.75rem', 
+                fontWeight: 600 
+              }}>
+                {totalLowStockCount}
+              </span>
+            </button>
             <button 
               className={`btn ${activeFilter === 'expired' ? 'btn-primary' : ''}`} 
-              style={{ background: activeFilter === 'expired' ? 'var(--primary)' : 'transparent', color: activeFilter === 'expired' ? 'white' : 'var(--text-slate)', padding: '8px 16px', fontSize: '0.8rem' }}
+              style={{ 
+                background: activeFilter === 'expired' ? 'var(--primary)' : 'transparent', 
+                color: activeFilter === 'expired' ? 'white' : 'var(--text-slate)', 
+                padding: '8px 16px', 
+                fontSize: '0.8rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
               onClick={() => setActiveFilter('expired')}
-            >منتهية الصلاحية</button>
+            >
+              <span>منتهية الصلاحية</span>
+              <span style={{ 
+                background: activeFilter === 'expired' 
+                  ? 'rgba(255, 255, 255, 0.22)' 
+                  : (totalExpiredCount > 0 ? '#fee2e2' : '#e2e8f0'), 
+                color: activeFilter === 'expired' 
+                  ? 'white' 
+                  : (totalExpiredCount > 0 ? '#ef4444' : '#475569'), 
+                padding: '2px 8px', 
+                borderRadius: '20px', 
+                fontSize: '0.75rem', 
+                fontWeight: 600 
+              }}>
+                {totalExpiredCount}
+              </span>
+            </button>
           </div>
           <button className="btn" style={{ background: 'var(--secondary)', color: 'white' }} onClick={() => setIsRestockOpen(true)}>
             <ShoppingCart size={20} /> إضافة وجبة لشحنة موجودة
@@ -1144,7 +1471,7 @@ Return JSON in this format:
                 <td>
                   <div style={{ fontWeight: 600 }}>{med.name}</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 500 }}>{med.scientific_name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{med.barcode}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{med.barcode ? med.barcode : "none"}</div>
                 </td>
                 <td>{med.category_name}</td>
                 <td style={{ fontWeight: 600 }}>{med.stock}</td>
@@ -1336,11 +1663,11 @@ Return JSON in this format:
         onClose={() => { 
           setIsAIModalOpen(false); 
           setExtractedItems([]); 
-          setScannedImage(null); 
-          setScannedImageName(""); 
+          setScannedImages([]); 
         }} 
         title="إضافة أدوية بالذكاء الاصطناعي"
         maxWidth="1000px"
+        closeOnOverlayClick={false}
       >
         {renderAIModalContent()}
       </Modal>

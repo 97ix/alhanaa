@@ -9,9 +9,17 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   maxWidth?: string;
+  closeOnOverlayClick?: boolean;
 }
 
-export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, maxWidth }) => {
+export const Modal: React.FC<ModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  title, 
+  children, 
+  maxWidth,
+  closeOnOverlayClick = true 
+}) => {
   // Prevent scrolling on body when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -46,7 +54,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
             padding: '40px 20px',
             overflowY: 'auto'
           }} 
-          onClick={onClose}
+          onClick={closeOnOverlayClick ? onClose : undefined}
         >
           <motion.div 
             initial={{ scale: 0.9, opacity: 0, y: 30 }}
