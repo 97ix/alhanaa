@@ -13,8 +13,12 @@ import {
   UserPlus,
   Activity,
   Truck,
-  CheckCircle
+  CheckCircle,
+  LogOut,
+  KeyRound,
+  Calendar
 } from "lucide-react";
+import { motion } from "framer-motion";
 import "./App.css";
 import { initDb, getDb } from "./lib/db";
 import { InventoryModule } from "./components/InventoryModule";
@@ -23,6 +27,7 @@ import { SuppliersModule } from "./components/SuppliersModule";
 import { SettingsModule } from "./components/SettingsModule";
 import { CustomersModule } from "./components/CustomersModule";
 import { OrdersModule } from "./components/OrdersModule";
+import { ExpiryModule } from "./components/ExpiryModule";
 
 const Dashboard = ({ onNavigate }: { onNavigate: (tab: string, filter?: string) => void }) => {
   const [stats, setStats] = useState({
@@ -162,6 +167,281 @@ const Dashboard = ({ onNavigate }: { onNavigate: (tab: string, filter?: string) 
   );
 };
 
+const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) => void }) => {
+  const [selectedUserId, setSelectedUserId] = useState<number>(users[0]?.id || 0);
+  const [pin, setPin] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [shake, setShake] = useState(false);
+
+  useEffect(() => {
+    if (users.length > 0 && !selectedUserId) {
+      setSelectedUserId(users[0].id);
+    }
+  }, [users]);
+
+  const selectedUser = users.find(u => u.id === selectedUserId);
+
+  const handleKeyPress = (digit: string) => {
+    setErrorMsg("");
+    if (pin.length < (selectedUser?.pin?.length || 4)) {
+      setPin(prev => prev + digit);
+    }
+  };
+
+  const handleBackspace = () => {
+    setPin(prev => prev.slice(0, -1));
+  };
+
+  const handleClear = () => {
+    setPin("");
+  };
+
+  const handleSubmit = () => {
+    if (!selectedUser) return;
+    if (pin === selectedUser.pin) {
+      onUnlock(selectedUser);
+    } else {
+      setShake(true);
+      setErrorMsg("رمز PIN غير صحيح");
+      setPin("");
+      setTimeout(() => setShake(false), 500);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedUser && pin.length === selectedUser.pin.length) {
+      if (pin === selectedUser.pin) {
+        onUnlock(selectedUser);
+      } else {
+        setShake(true);
+        setErrorMsg("رمز PIN غير صحيح");
+        setPin("");
+        setTimeout(() => setShake(false), 500);
+      }
+    }
+  }, [pin, selectedUser]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key >= "0" && e.key <= "9") {
+        handleKeyPress(e.key);
+      } else if (e.key === "Backspace") {
+        handleBackspace();
+      } else if (e.key === "Enter") {
+        handleSubmit();
+      } else if (e.key === "Escape") {
+        handleClear();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pin, selectedUserId, users]);
+
+  return (
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      width: '100vw',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'radial-gradient(circle, #1e293b 0%, #0f172a 100%)',
+      color: 'white',
+      fontFamily: 'var(--font-headline)',
+      direction: 'rtl',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      zIndex: 99999
+    }}>
+      <motion.div 
+        animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
+        transition={{ duration: 0.4 }}
+        style={{
+          width: '100%',
+          maxWidth: '420px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '28px',
+          padding: '40px 32px',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        }}
+      >
+        <div style={{
+          width: '64px',
+          height: '64px',
+          borderRadius: '20px',
+          background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '24px',
+          boxShadow: '0 0 20px rgba(13, 148, 136, 0.4)'
+        }}>
+          <KeyRound size={28} color="white" />
+        </div>
+
+        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'white', marginBottom: '8px', textAlign: 'center' }}>صيدلية الهناء</h2>
+        <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '32px', textAlign: 'center' }}>يرجى اختيار المستخدم وإدخال رمز PIN للدخول</p>
+
+        <div style={{ width: '100%', marginBottom: '24px' }}>
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '8px' }}>المستخدم</label>
+          <select 
+            style={{
+              width: '100%',
+              height: '50px',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '12px',
+              color: 'white',
+              padding: '0 16px',
+              fontWeight: 700,
+              fontSize: '1rem',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+            value={selectedUserId}
+            onChange={(e) => {
+              setSelectedUserId(parseInt(e.target.value));
+              setErrorMsg("");
+              setPin("");
+            }}
+          >
+            {users.map(u => (
+              <option key={u.id} value={u.id} style={{ background: '#0f172a', color: 'white' }}>
+                {u.name} ({u.role === 'admin' ? 'صيدلي رئيسي' : 'مساعد صيدلي'})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', gap: '16px', margin: '16px 0 32px' }}>
+          {[...Array(selectedUser?.pin?.length || 4)].map((_, i) => (
+            <div key={i} style={{
+              width: '16px',
+              height: '16px',
+              borderRadius: '50%',
+              border: '2px solid rgba(255,255,255,0.2)',
+              background: i < pin.length ? 'var(--primary)' : 'transparent',
+              boxShadow: i < pin.length ? '0 0 8px var(--primary)' : 'none',
+              transition: 'all 0.15s ease'
+            }} />
+          ))}
+        </div>
+
+        {errorMsg && (
+          <p style={{ color: '#f87171', fontSize: '0.85rem', fontWeight: 700, marginBottom: '20px' }}>{errorMsg}</p>
+        )}
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '16px',
+          width: '100%',
+          maxWidth: '280px',
+          marginBottom: '8px'
+        }}>
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
+            <button
+              key={num}
+              type="button"
+              onClick={() => handleKeyPress(num)}
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                color: 'white',
+                fontSize: '1.25rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+            >
+              {num}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={handleClear}
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto'
+            }}
+          >
+            مسح
+          </button>
+          <button
+            type="button"
+            onClick={() => handleKeyPress("0")}
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              color: 'white',
+              fontSize: '1.25rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+          >
+            0
+          </button>
+          <button
+            type="button"
+            onClick={handleBackspace}
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto'
+            }}
+          >
+            حذف
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [inventoryFilter, setInventoryFilter] = useState("");
@@ -169,19 +449,29 @@ function App() {
   const [posCart, setPosCart] = useState<any[]>([]);
   const [posCustomerName, setPosCustomerName] = useState("");
   const [dbReady, setDbReady] = useState(false);
-  const [userState, setUserState] = useState({ name: "د. أنس ثورن", role: "صيدلي رئيسي" });
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
+
+  const fetchUsers = async () => {
+    try {
+      const db = await getDb();
+      const result = await db.select<any[]>("SELECT * FROM users ORDER BY name ASC");
+      setUsersList(result);
+      // Auto update current user if their details changed in users table
+      setCurrentUser((prev: any) => {
+        if (!prev) return null;
+        const updated = result.find(u => u.id === prev.id);
+        return updated || null;
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   useEffect(() => {
     initDb().then(async () => {
       setDbReady(true);
-      const db = await getDb();
-      const settings = await db.select<any[]>("SELECT * FROM app_settings WHERE key IN ('user_name', 'user_role')");
-      const newState = { ...userState };
-      settings.forEach(s => {
-        if (s.key === 'user_name') newState.name = s.value;
-        if (s.key === 'user_role') newState.role = s.value;
-      });
-      setUserState(newState);
+      await fetchUsers();
     }).catch(console.error);
   }, []);
 
@@ -207,7 +497,6 @@ function App() {
     } else if (query.includes("طلب") || query.includes("بيع")) {
       setActiveTab("pos");
     } else {
-      // Default to inventory search if nothing else matches
       setActiveTab("inventory");
     }
   };
@@ -215,26 +504,32 @@ function App() {
   const renderContent = () => {
     switch(activeTab) {
       case "dashboard": return <Dashboard onNavigate={handleNavigate} />;
-      case "inventory": return <InventoryModule initialFilter={inventoryFilter} initialSearch={globalSearch} />;
-      case "customers": return <CustomersModule initialSearch={globalSearch} />;
-      case "suppliers": return <SuppliersModule initialSearch={globalSearch} />;
+      case "inventory": return <InventoryModule initialFilter={inventoryFilter} initialSearch={globalSearch} currentUser={currentUser} />;
+      case "customers": return <CustomersModule initialSearch={globalSearch} currentUser={currentUser} />;
+      case "suppliers": return <SuppliersModule initialSearch={globalSearch} currentUser={currentUser} />;
       case "pos": return (
         <OrdersModule 
           posProps={{
             cart: posCart, 
             setCart: setPosCart, 
             customerName: posCustomerName, 
-            setCustomerName: setPosCustomerName 
+            setCustomerName: setPosCustomerName,
+            currentUser: currentUser
           }}
         />
       );
       case "reports": return <ReportsModule />;
-      case "settings": return <SettingsModule />;
+      case "expiry": return <ExpiryModule />;
+      case "settings": return <SettingsModule currentUser={currentUser} onUserUpdate={fetchUsers} />;
       default: return <Dashboard onNavigate={handleNavigate} />;
     }
   };
 
   if (!dbReady) return <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>...جاري التحميل</div>;
+
+  if (currentUser === null) {
+    return <LockScreen users={usersList} onUnlock={(user) => setCurrentUser(user)} />;
+  }
 
   return (
     <>
@@ -264,19 +559,43 @@ function App() {
             <ShoppingCart size={20} />
             الطلبات
           </div>
-          <div className={`sidebar-item ${activeTab === "reports" ? "active" : ""}`} onClick={() => setActiveTab("reports")}>
-            <TrendingUp size={20} />
-            التقارير المالية
-          </div>
+          {currentUser.role === 'admin' && (
+            <div className={`sidebar-item ${activeTab === "reports" ? "active" : ""}`} onClick={() => setActiveTab("reports")}>
+              <TrendingUp size={20} />
+              التقارير المالية
+            </div>
+          )}
+          {currentUser.role === 'admin' && (
+            <div className={`sidebar-item ${activeTab === "expiry" ? "active" : ""}`} onClick={() => setActiveTab("expiry")}>
+              <Calendar size={20} />
+              صلاحية الأدوية
+            </div>
+          )}
           <div className={`sidebar-item ${activeTab === "customers" ? "active" : ""}`} onClick={() => setActiveTab("customers")}>
             <Users size={20} />
             المرضى
           </div>
         </nav>
 
-        <div className={`sidebar-item ${activeTab === "settings" ? "active" : ""}`} onClick={() => setActiveTab("settings")} style={{ borderTop: '1px solid var(--border)', marginTop: '24px', paddingTop: '24px' }}>
-          <Settings size={20} />
-          الإعدادات
+        {currentUser.role === 'admin' && (
+          <div className={`sidebar-item ${activeTab === "settings" ? "active" : ""}`} onClick={() => setActiveTab("settings")} style={{ borderTop: '1px solid var(--border)', marginTop: '24px', paddingTop: '24px' }}>
+            <Settings size={20} />
+            الإعدادات
+          </div>
+        )}
+
+        <div 
+          className="sidebar-item" 
+          onClick={() => setCurrentUser(null)} 
+          style={{ 
+            color: 'var(--error)', 
+            marginTop: currentUser.role === 'cashier' ? '24px' : '8px', 
+            borderTop: currentUser.role === 'cashier' ? '1px solid var(--border)' : 'none',
+            paddingTop: currentUser.role === 'cashier' ? '24px' : '12px'
+          }}
+        >
+          <LogOut size={20} />
+          تسجيل الخروج
         </div>
         
       </aside>
@@ -304,11 +623,13 @@ function App() {
             <div style={{ width: 1, height: 24, background: 'var(--outline-variant)', opacity: 0.3 }}></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ textAlign: 'left' }}>
-                <p style={{ fontSize: '0.8125rem', fontWeight: 700 }}>{userState.name}</p>
-                <p style={{ fontSize: '0.625rem', color: 'var(--text-slate)', fontWeight: 600 }}>{userState.role}</p>
+                <p style={{ fontSize: '0.8125rem', fontWeight: 700 }}>{currentUser.name}</p>
+                <p style={{ fontSize: '0.625rem', color: 'var(--text-slate)', fontWeight: 600 }}>
+                  {currentUser.role === 'admin' ? 'صيدلي رئيسي' : 'مساعد صيدلي'}
+                </p>
               </div>
               <div style={{ width: 40, height: 40, borderRadius: '12px', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                {userState.name.split(' ').map(n => n[0]).join('')}
+                {currentUser.name.split(' ').map((n: string) => n[0]).join('')}
               </div>
             </div>
           </div>

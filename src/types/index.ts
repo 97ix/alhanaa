@@ -57,3 +57,12 @@ export interface MedicineBatch {
   selling_price: number;
   created_at: string;
 }
+
+export interface User {
+  id: number;
+  name: string;
+  role: 'admin' | 'cashier';
+  pin: string;
+  created_at: string;
+}
+

@@ -11,8 +11,8 @@ export const OrdersModule = ({ posProps }: any) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<any | null>(null);
   const [saleItems, setSaleItems] = useState<any[]>([]);
-  const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
-  const [returnQuantities, setReturnQuantities] = useState<Record<number, number>>({});
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({});
   const [preDiscountTotal, setPreDiscountTotal] = useState(0);
 
   const fetchSales = async () => {
@@ -51,12 +51,32 @@ export const OrdersModule = ({ posProps }: any) => {
       totalValue += (item.unit_price * item.quantity);
     });
     
+    // Group sale items by medicine_id and unit_price to display them consolidated
+    const groupedItemsMap: Record<string, any> = {};
+    items.forEach(item => {
+      const key = `${item.medicine_id}-${item.unit_price}`;
+      if (groupedItemsMap[key]) {
+        groupedItemsMap[key].quantity += item.quantity;
+        groupedItemsMap[key].rawItems.push({ id: item.id, quantity: item.quantity });
+      } else {
+        groupedItemsMap[key] = {
+          ...item,
+          rawItems: [{ id: item.id, quantity: item.quantity }]
+        };
+      }
+    });
+    const groupedItems = Object.values(groupedItemsMap);
+    
     setPreDiscountTotal(totalValue);
-    setSaleItems(items);
+    setSaleItems(groupedItems);
     setSelectedSale(sale);
     setSelectedItemIds([]); 
-    const qtys: Record<number, number> = {};
-    items.forEach(i => qtys[i.id] = i.quantity);
+    
+    const qtys: Record<string, number> = {};
+    groupedItems.forEach(i => {
+      const key = `${i.medicine_id}-${i.unit_price}`;
+      qtys[key] = i.quantity;
+    });
     setReturnQuantities(qtys);
     setIsModalOpen(true);
   };
@@ -65,20 +85,20 @@ export const OrdersModule = ({ posProps }: any) => {
     if (selectedItemIds.length === saleItems.length) {
       setSelectedItemIds([]);
     } else {
-      setSelectedItemIds(saleItems.map(i => i.id));
+      setSelectedItemIds(saleItems.map(i => `${i.medicine_id}-${i.unit_price}`));
     }
   };
 
-  const toggleItem = (id: number) => {
+  const toggleItem = (key: string) => {
     setSelectedItemIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     );
   };
 
-  const updateReturnQty = (id: number, delta: number, max: number) => {
+  const updateReturnQty = (key: string, delta: number, max: number) => {
     setReturnQuantities(prev => ({
       ...prev,
-      [id]: Math.max(1, Math.min(max, (prev[id] || 1) + delta))
+      [key]: Math.max(1, Math.min(max, (prev[key] || 1) + delta))
     }));
   };
 
@@ -86,9 +106,9 @@ export const OrdersModule = ({ posProps }: any) => {
     if (!selectedSale || preDiscountTotal === 0) return 0;
     let liveRefund = 0;
     const payRatio = selectedSale.total_amount / preDiscountTotal;
-    selectedItemIds.forEach(id => {
-      const item = saleItems.find(i => i.id === id);
-      const qty = returnQuantities[id] || 0;
+    selectedItemIds.forEach(key => {
+      const item = saleItems.find(i => `${i.medicine_id}-${i.unit_price}` === key);
+      const qty = returnQuantities[key] || 0;
       if (item) {
         liveRefund += (item.unit_price * qty) * payRatio;
       }
@@ -104,32 +124,68 @@ export const OrdersModule = ({ posProps }: any) => {
     let actualRefundToUser = 0;
     const payRatio = preDiscountTotal > 0 ? selectedSale.total_amount / preDiscountTotal : 1;
 
-    for (const itemId of selectedItemIds) {
-      const item = saleItems.find(i => i.id === itemId);
+    for (const key of selectedItemIds) {
+      const item = saleItems.find(i => `${i.medicine_id}-${i.unit_price}` === key);
       if (!item) continue;
 
-      const qtyToReturn = returnQuantities[itemId];
-      
-      await db.execute(
-        "UPDATE medicines SET stock = stock + $1 WHERE id = $2",
-        [qtyToReturn, item.medicine_id]
-      );
-      
-      const itemValueWithTax = (item.unit_price * qtyToReturn);
-      actualRefundToUser += (itemValueWithTax * payRatio);
-      
-      if (qtyToReturn >= item.quantity) {
-        await db.execute("DELETE FROM sale_items WHERE id = $1", [itemId]);
-      } else {
-        await db.execute("UPDATE sale_items SET quantity = quantity - $1 WHERE id = $2", [qtyToReturn, itemId]);
+      let qtyToReturn = returnQuantities[key] || 0;
+      const sortedRawItems = [...item.rawItems].sort((a, b) => b.id - a.id);
+
+      for (const rawItem of sortedRawItems) {
+        if (qtyToReturn <= 0) break;
+        const returnFromThis = Math.min(rawItem.quantity, qtyToReturn);
+        
+        await db.execute(
+          "UPDATE medicines SET stock = stock + $1 WHERE id = $2",
+          [returnFromThis, item.medicine_id]
+        );
+        
+        const itemValueWithTax = (item.unit_price * returnFromThis);
+        actualRefundToUser += (itemValueWithTax * payRatio);
+        
+        if (returnFromThis >= rawItem.quantity) {
+          await db.execute("DELETE FROM sale_items WHERE id = $1", [rawItem.id]);
+        } else {
+          await db.execute("UPDATE sale_items SET quantity = quantity - $1 WHERE id = $2", [returnFromThis, rawItem.id]);
+        }
+        qtyToReturn -= returnFromThis;
       }
+    }
+
+    // Calculate debt reduction and cash refund
+    let debtReduction = 0;
+    let cashRefund = 0;
+    
+    if (selectedSale.customer_id) {
+      const originalSaleDebt = Math.max(0, selectedSale.total_amount - (selectedSale.amount_paid || 0));
+      if (originalSaleDebt > 0) {
+        debtReduction = Math.min(originalSaleDebt, actualRefundToUser);
+        cashRefund = actualRefundToUser - debtReduction;
+      } else {
+        cashRefund = actualRefundToUser;
+      }
+      
+      if (debtReduction > 0) {
+        // Decrease customer balance (which represents outstanding debt)
+        await db.execute(
+          "UPDATE customers SET balance = balance - $1 WHERE id = $2",
+          [debtReduction, selectedSale.customer_id]
+        );
+        // Record the transaction on the customer's account
+        await db.execute(
+          "INSERT INTO customer_transactions (customer_id, type, amount, description) VALUES ($1, $2, $3, $4)",
+          [selectedSale.customer_id, 'payment', debtReduction, `إرجاع مبيعات (تخفيض دين) لفاتورة #${selectedSale.id}`]
+        );
+      }
+    } else {
+      cashRefund = actualRefundToUser;
     }
 
     const remainingItemsRaw = await db.select<any[]>("SELECT * FROM sale_items WHERE sale_id = $1", [selectedSale.id]);
     
     if (remainingItemsRaw.length === 0) {
       await db.execute(
-        "UPDATE sales SET status = 'returned', total_amount = 0, tax_amount = 0, discount = 0 WHERE id = $1", 
+        "UPDATE sales SET status = 'returned', total_amount = 0, tax_amount = 0, discount = 0, amount_paid = 0 WHERE id = $1", 
         [selectedSale.id]
       );
     } else {
@@ -137,16 +193,17 @@ export const OrdersModule = ({ posProps }: any) => {
       const newDiscount = selectedSale.total_amount > 0 
         ? selectedSale.discount * (newTotal / selectedSale.total_amount) 
         : 0;
+      const newAmountPaid = Math.max(0, (selectedSale.amount_paid || 0) - cashRefund);
       
       await db.execute(
-        "UPDATE sales SET total_amount = $1, status = 'partial_returned', discount = $2 WHERE id = $3", 
-        [newTotal, newDiscount, selectedSale.id]
+        "UPDATE sales SET total_amount = $1, status = 'partial_returned', discount = $2, amount_paid = $3 WHERE id = $4", 
+        [newTotal, newDiscount, newAmountPaid, selectedSale.id]
       );
     }
 
     setIsModalOpen(false);
     fetchSales();
-    alert("تم إجراء التعديلات واسترجاع الضريبة والمبالغ المحددة.");
+    alert("تم إجراء التعديلات واسترجاع الضريبة وتحديث حساب العميل / المبالغ المحددة.");
   };
 
   return (
@@ -273,37 +330,41 @@ export const OrdersModule = ({ posProps }: any) => {
                     </button>
                   </div>
                   
-                  {saleItems.map((item: any) => (
-                    <div key={item.id} onClick={() => toggleItem(item.id)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: selectedItemIds.includes(item.id) ? 'rgba(13, 148, 136, 0.05)' : 'transparent', borderRadius: '12px', marginBottom: '4px', cursor: 'pointer' }}>
-                      <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${selectedItemIds.includes(item.id) ? 'var(--primary)' : '#cbd5e1'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: selectedItemIds.includes(item.id) ? 'var(--primary)' : 'white' }}>
-                        {selectedItemIds.includes(item.id) && <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'white' }} />}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{item.medicine_name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          المباع: {item.quantity} × {item.unit_price.toLocaleString()} د.ع
+                  {saleItems.map((item: any) => {
+                    const key = `${item.medicine_id}-${item.unit_price}`;
+                    const isSelected = selectedItemIds.includes(key);
+                    return (
+                      <div key={key} onClick={() => toggleItem(key)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isSelected ? 'rgba(13, 148, 136, 0.05)' : 'transparent', borderRadius: '12px', marginBottom: '4px', cursor: 'pointer' }}>
+                        <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${isSelected ? 'var(--primary)' : '#cbd5e1'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isSelected ? 'var(--primary)' : 'white' }}>
+                          {isSelected && <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'white' }} />}
                         </div>
-                        {selectedItemIds.includes(item.id) && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }} onClick={e => e.stopPropagation()}>
-                            <span style={{ fontSize: '0.75rem' }}>الكمية المراد إرجاعها:</span>
-                            <button onClick={() => updateReturnQty(item.id, -1, item.quantity)} style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white' }}>-</button>
-                            <span style={{ fontWeight: 800 }}>{returnQuantities[item.id] || 1}</span>
-                            <button onClick={() => updateReturnQty(item.id, 1, item.quantity)} style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white' }}>+</button>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{item.medicine_name}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            المباع: {item.quantity} × {item.unit_price.toLocaleString()} د.ع
                           </div>
-                        )}
-                      </div>
-                      <div style={{ fontWeight: 700, textAlign: 'left' }}>
-                        <div style={{ fontSize: '0.85rem' }}>
-                          {(item.unit_price * item.quantity).toLocaleString()} د.ع
+                          {isSelected && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }} onClick={e => e.stopPropagation()}>
+                              <span style={{ fontSize: '0.75rem' }}>الكمية المراد إرجاعها:</span>
+                              <button onClick={() => updateReturnQty(key, -1, item.quantity)} style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white' }}>-</button>
+                              <span style={{ fontWeight: 800 }}>{returnQuantities[key] || 1}</span>
+                              <button onClick={() => updateReturnQty(key, 1, item.quantity)} style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white' }}>+</button>
+                            </div>
+                          )}
                         </div>
-                        {selectedItemIds.includes(item.id) && (
-                          <div style={{ color: 'var(--error)', fontSize: '0.75rem', marginTop: '4px' }}>
-                            صافي الاسترجاع: - {Math.round((item.unit_price * (selectedSale.total_amount / preDiscountTotal)) * (returnQuantities[item.id] || 0)).toLocaleString()} د.ع
+                        <div style={{ fontWeight: 700, textAlign: 'left' }}>
+                          <div style={{ fontSize: '0.85rem' }}>
+                            {(item.unit_price * item.quantity).toLocaleString()} د.ع
                           </div>
-                        )}
+                          {isSelected && (
+                            <div style={{ color: 'var(--error)', fontSize: '0.75rem', marginTop: '4px' }}>
+                              صافي الاسترجاع: - {Math.round((item.unit_price * (selectedSale.total_amount / preDiscountTotal)) * (returnQuantities[key] || 0)).toLocaleString()} د.ع
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   <div style={{ marginTop: '16px', borderTop: '1px dashed #cbd5e1', paddingTop: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>

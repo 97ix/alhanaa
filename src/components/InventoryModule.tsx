@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit2, Trash2, Search, ScanBarcode, Camera, ShoppingCart, Sparkles, Upload, Brain, Check, AlertTriangle, X } from 'lucide-react';
+import { useState, useEffect, useRef, Fragment } from 'react';
+import { Plus, Edit2, Trash2, Search, ScanBarcode, Camera, ShoppingCart, Sparkles, Upload, Brain, Check, AlertTriangle, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { getDb } from '../lib/db';
+import { geminiKeyManager } from '../lib/geminiKeyManager';
 import { Medicine, Category } from '../types';
 import { Modal } from './Modal';
 import { CameraScanner } from './CameraScanner';
@@ -317,7 +318,7 @@ const RestockForm = ({ medicines, onSubmit, onCancel, defaultTaxRate }: { medici
   );
 };
 
-export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { initialFilter?: string, initialSearch?: string }) => {
+export const InventoryModule = ({ initialFilter = "", initialSearch = "", currentUser }: { initialFilter?: string, initialSearch?: string, currentUser?: any }) => {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -333,12 +334,45 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
   // AI Ingestion States
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isAIScanning, setIsAIScanning] = useState(false);
-  const [aiApiKey, setAiApiKey] = useState("");
   const [aiError, setAiError] = useState("");
   const [scannedImages, setScannedImages] = useState<{ id: string; name: string; dataUrl: string }[]>([]);
   const [extractedItems, setExtractedItems] = useState<any[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [toastNotification, setToastNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
+  // State for Fetch Scientific Names feature
+  const [isFetchSciOpen, setIsFetchSciOpen] = useState(false);
+  const [sciMeds, setSciMeds] = useState<{ id: number; name: string; description: string; scientific_name: string; status: 'idle' | 'loading' | 'success' | 'failed' }[]>([]);
+  const [isFetchingSci, setIsFetchingSci] = useState(false);
+  const [sciProgress, setSciProgress] = useState(0);
+  const shouldStopRef = useRef(false);
+
+  // Expandable Row States
+  const [expandedMedId, setExpandedMedId] = useState<number | null>(null);
+  const [medicineBatches, setMedicineBatches] = useState<Record<number, any[]>>({});
+  const [loadingBatches, setLoadingBatches] = useState<number | null>(null);
+
+  const toggleExpand = async (medId: number) => {
+    if (expandedMedId === medId) {
+      setExpandedMedId(null);
+    } else {
+      setExpandedMedId(medId);
+      setLoadingBatches(medId);
+      try {
+        const db = await getDb();
+        const result = await db.select<any[]>(
+          "SELECT * FROM medicine_batches WHERE medicine_id = $1 ORDER BY expiry_date ASC",
+          [medId]
+        );
+        setMedicineBatches(prev => ({ ...prev, [medId]: result }));
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingBatches(null);
+      }
+    }
+  };
 
   const fetchInventory = async () => {
     const db = await getDb();
@@ -347,9 +381,8 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
     const settings = await db.select<any[]>("SELECT value FROM app_settings WHERE key = 'tax_rate'");
     if (settings.length > 0) setAppTaxRate(parseFloat(settings[0].value));
 
-    // Fetch gemini_api_key
-    const geminiSettings = await db.select<any[]>("SELECT value FROM app_settings WHERE key = 'gemini_api_key'");
-    if (geminiSettings.length > 0) setAiApiKey(geminiSettings[0].value || "");
+    // Load key manager pool
+    await geminiKeyManager.load();
 
     const result = await db.select<Medicine[]>(`
       SELECT m.*, c.name as category_name 
@@ -361,6 +394,15 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
     
     const cats = await db.select<Category[]>("SELECT * FROM categories");
     setCategories(cats);
+
+    // Refresh expanded batch details if one is expanded
+    if (expandedMedId) {
+      const bRes = await db.select<any[]>(
+        "SELECT * FROM medicine_batches WHERE medicine_id = $1 ORDER BY expiry_date ASC",
+        [expandedMedId]
+      );
+      setMedicineBatches(prev => ({ ...prev, [expandedMedId]: bRes }));
+    }
   };
 
   const fetchBatches = async (medId: number) => {
@@ -380,6 +422,142 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
   useEffect(() => {
     setSearchQuery(initialSearch);
   }, [initialSearch]);
+
+  const fetchScientificName = async (tradeName: string, description: string): Promise<string> => {
+    if (!geminiKeyManager.hasKeys()) return "";
+    if (shouldStopRef.current) return "";
+    try {
+      const prompt = `You are a clinical pharmacist. Given this medicine brand name (Trade Name): "${tradeName}" and its description/context: "${description || ""}".
+Determine its primary active pharmaceutical ingredient (Scientific Name in English).
+Respond ONLY in a JSON object with the following schema:
+{
+  "scientific_name": "the scientific name of the drug, in English, e.g., 'Paracetamol', 'Amoxicillin', 'Tetracycline'"
+}
+Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
+
+      const response = await geminiKeyManager.fetchWithRotation(
+        (key) => `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          })
+        }
+      );
+
+      if (response.ok) {
+        const resJson = await response.json();
+        let text = resJson.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        text = text.trim();
+        if (text.startsWith("```json")) {
+          text = text.replace(/^```json/, "").replace(/```$/, "").trim();
+        } else if (text.startsWith("```")) {
+          text = text.replace(/^```/, "").replace(/```$/, "").trim();
+        }
+        const result = JSON.parse(text);
+        return result.scientific_name || "";
+      }
+
+      console.error("Gemini API error for", tradeName, response.status);
+    } catch (e) {
+      console.error("Error fetching scientific name:", e);
+    }
+    return "";
+  };
+
+  const openFetchScientificModal = async () => {
+    try {
+      shouldStopRef.current = false;
+      const db = await getDb();
+      const result = await db.select<any[]>(
+        "SELECT id, name, description FROM medicines WHERE scientific_name IS NULL OR scientific_name = ''"
+      );
+      if (result.length === 0) {
+        showToast("جميع الأدوية في المخزن تحتوي على اسم علمي مسجل بالفعل!", "success");
+        return;
+      }
+      setSciMeds(result.map(m => ({
+        id: m.id,
+        name: m.name,
+        description: m.description || "",
+        scientific_name: "",
+        status: 'idle'
+      })));
+      setSciProgress(0);
+      setIsFetchSciOpen(true);
+    } catch (e) {
+      console.error(e);
+      showToast("حدث خطأ أثناء جلب الأدوية من قاعدة البيانات", "error");
+    }
+  };
+
+  const startFetchingScientificNames = async () => {
+    if (!geminiKeyManager.hasKeys()) {
+      alert("يرجى إضافة مفتاح Gemini API أولاً في صفحة الإعدادات لتتمكن من استخدام الذكاء الاصطناعي.");
+      return;
+    }
+    setIsFetchingSci(true);
+    shouldStopRef.current = false;
+    const updated = [...sciMeds];
+    
+    for (let i = 0; i < updated.length; i++) {
+      if (shouldStopRef.current) {
+        break;
+      }
+
+      if (updated[i].status === 'success') {
+        continue;
+      }
+
+      updated[i].status = 'loading';
+      setSciMeds([...updated]);
+      
+      const sciName = await fetchScientificName(updated[i].name, updated[i].description);
+      
+      if (shouldStopRef.current) {
+        updated[i].status = 'idle';
+        setSciMeds([...updated]);
+        break;
+      }
+
+      if (sciName) {
+        updated[i].scientific_name = sciName;
+        updated[i].status = 'success';
+      } else {
+        updated[i].status = 'failed';
+      }
+      setSciProgress(Math.round(((i + 1) / updated.length) * 100));
+      setSciMeds([...updated]);
+      
+      // Delay to avoid hitting rate limits
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    setIsFetchingSci(false);
+  };
+
+  const saveScientificNames = async () => {
+    try {
+      const db = await getDb();
+      let count = 0;
+      for (const m of sciMeds) {
+        if (m.scientific_name && m.scientific_name.trim()) {
+          await db.execute(
+            "UPDATE medicines SET scientific_name = $1 WHERE id = $2",
+            [m.scientific_name.trim(), m.id]
+          );
+          count++;
+        }
+      }
+      showToast(`تم حفظ الاسم العلمي لـ ${count} دواء بنجاح!`, "success");
+      setIsFetchSciOpen(false);
+      fetchInventory();
+    } catch (e) {
+      console.error(e);
+      showToast("فشل في حفظ الأسماء العلمية في قاعدة البيانات", "error");
+    }
+  };
 
   // AI Ingestion Helper Functions
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -409,13 +587,6 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
     return str;
   };
 
-  const saveModalApiKey = async (key: string) => {
-    if (!key.trim()) return;
-    const db = await getDb();
-    await db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('gemini_api_key', $1)", [key]);
-    setAiApiKey(key);
-    showToast("تم حفظ مفتاح Gemini API بنجاح!", "success");
-  };
 
   const readFilesAsDataURLs = async (files: FileList): Promise<{ id: string; name: string; dataUrl: string }[]> => {
     const promises = Array.from(files).map(file => {
@@ -475,8 +646,8 @@ export const InventoryModule = ({ initialFilter = "", initialSearch = "" }: { in
       setAiError("يرجى اختيار أو سحب صورة واحدة على الأقل");
       return;
     }
-    if (!aiApiKey.trim()) {
-      setAiError("يرجى إدخال مفتاح Gemini API أولاً");
+    if (!geminiKeyManager.hasKeys()) {
+      setAiError("يرجى إضافة مفتاح Gemini API في صفحة الإعدادات أولاً.");
       return;
     }
 
@@ -524,85 +695,44 @@ Return JSON in this format:
         });
       }
 
-      let response: Response | undefined;
-      let lastError = "";
       const model = "gemini-2.5-flash";
-      let attempts = 5;
-      let delayMs = 1500;
-
-      while (attempts > 0) {
-        try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${aiApiKey}`;
-          response = await fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: parts
-                }
-              ],
-              generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                  type: "OBJECT",
-                  properties: {
+      const response = await geminiKeyManager.fetchWithRotation(
+        (key) => `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: parts }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  items: {
+                    type: "ARRAY",
                     items: {
-                      type: "ARRAY",
-                      items: {
-                        type: "OBJECT",
-                        properties: {
-                          name: { type: "STRING" },
-                          barcode: { type: "STRING" },
-                          quantity: { type: "INTEGER" },
-                          total_price: { type: "NUMBER" },
-                          purchase_price: { type: "NUMBER" },
-                          expiry_date: { type: "STRING" }
-                        },
-                        required: ["name", "barcode", "quantity", "total_price", "purchase_price", "expiry_date"]
-                      }
+                      type: "OBJECT",
+                      properties: {
+                        name: { type: "STRING" },
+                        barcode: { type: "STRING" },
+                        quantity: { type: "INTEGER" },
+                        total_price: { type: "NUMBER" },
+                        purchase_price: { type: "NUMBER" },
+                        expiry_date: { type: "STRING" }
+                      },
+                      required: ["name", "barcode", "quantity", "total_price", "purchase_price", "expiry_date"]
                     }
-                  },
-                  required: ["items"]
-                }
+                  }
+                },
+                required: ["items"]
               }
-            })
-          });
-
-          if (response.ok) {
-            break;
-          }
-
-          const errorData = await response.json().catch(() => ({}));
-          const errMsg = errorData.error?.message || `API Error: ${response.status}`;
-          lastError = errMsg;
-
-          const isRetriable = response.status === 429 || response.status === 503 || response.status >= 500 || errMsg.toLowerCase().includes("high demand") || errMsg.toLowerCase().includes("quota");
-          if (isRetriable) {
-            attempts--;
-            if (attempts > 0) {
-              await new Promise(resolve => setTimeout(resolve, delayMs));
-              delayMs *= 2;
-              continue;
             }
-          }
-          break;
-        } catch (err: any) {
-          lastError = err?.message || String(err);
-          attempts--;
-          if (attempts > 0) {
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-            delayMs *= 2;
-            continue;
-          }
-          break;
+          })
         }
-      }
+      );
 
       if (!response || !response.ok) {
-        throw new Error(lastError || "فشل الاتصال بخوادم الذكاء الاصطناعي. يرجى المحاولة مرة أخرى لاحقاً.");
+        throw new Error("فشل الاتصال بخوادم الذكاء الاصطناعي. يرجى التحقق من مفاتيح Gemini API في الإعدادات.");
       }
 
       const resJson = await response.json();
@@ -695,6 +825,16 @@ Return JSON in this format:
             [medId, quantityVal, expiryDateVal, purchasePriceVal, sellingPrice]
           );
 
+          if (!existingMed.scientific_name || !existingMed.scientific_name.trim()) {
+            const sciName = await fetchScientificName(nameVal, existingMed.description || "");
+            if (sciName) {
+              await db.execute(
+                "UPDATE medicines SET scientific_name = $1 WHERE id = $2",
+                [sciName, medId]
+              );
+            }
+          }
+
           if (!existingBarcodeStr && barcodeVal) {
             await db.execute(
               "UPDATE medicines SET stock = stock + $1, purchase_price = $2, price = $3, barcode = $5 WHERE id = $4",
@@ -707,9 +847,10 @@ Return JSON in this format:
             );
           }
         } else {
+          const sciName = await fetchScientificName(nameVal, "");
           const result = await db.execute(
-            "INSERT INTO medicines (name, category_id, stock, price, expiry_date, purchase_price, min_stock_level, barcode) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-            [nameVal, item.category_id, quantityVal, sellingPrice, expiryDateVal, purchasePriceVal, 5, barcodeVal]
+            "INSERT INTO medicines (name, category_id, stock, price, expiry_date, purchase_price, min_stock_level, barcode, scientific_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            [nameVal, item.category_id, quantityVal, sellingPrice, expiryDateVal, purchasePriceVal, 5, barcodeVal, sciName]
           );
           
           const newMedId = result.lastInsertId;
@@ -757,36 +898,16 @@ Return JSON in this format:
 
   const renderAIModalContent = () => {
     // 1. API Key Setup Screen
-    if (!aiApiKey.trim()) {
+    if (!geminiKeyManager.hasKeys()) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#eff6ff', padding: '16px', borderRadius: '16px', color: '#1e40af', border: '1px solid #bfdbfe' }}>
             <Brain size={24} />
             <div>
-              <h4 style={{ margin: 0, fontWeight: 700 }}>مفتاح Gemini API Key مطلوب</h4>
-              <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem' }}>للبدء في استخدام ميزة إضافة الأدوية بالذكاء الاصطناعي، يرجى إدخال مفتاح API الخاص بك. يمكنك الحصول عليه مجاناً من منصة Google AI Studio.</p>
+              <h4 style={{ margin: 0, fontWeight: 700 }}>مفاتيح Gemini API غير مضافة</h4>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem' }}>توجه إلى <strong>الإعدادات ← إعدادات الذكاء الاصطناعي</strong> وأضف مفتاح API واحداً أو أكثر لتفعيل هذه الميزة. يمكنك إضافة حتى 10 مفاتيح للتبديل التلقائي.</p>
             </div>
           </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>مفتاح API الخاص بـ Gemini</label>
-            <input 
-              type="password"
-              className="input"
-              style={{ width: '100%', background: '#f2f4f6', border: 'none', height: '48px', direction: 'ltr', padding: '0 16px', borderRadius: '12px' }}
-              placeholder="AIzaSy..."
-              id="modal-api-key-input"
-            />
-          </div>
-          <button 
-            className="btn btn-primary"
-            style={{ height: '48px', justifyContent: 'center', borderRadius: '12px' }}
-            onClick={() => {
-              const val = (document.getElementById('modal-api-key-input') as HTMLInputElement)?.value;
-              if (val) saveModalApiKey(val);
-            }}
-          >
-            حفظ ومتابعة
-          </button>
         </div>
       );
     }
@@ -1047,19 +1168,9 @@ Return JSON in this format:
           <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
             قم برفع صورة لفاتورة شراء أو قائمة الأدوية، وسيقوم الذكاء الاصطناعي باستخراج كافة التفاصيل لك تلقائياً.
           </p>
-          <button 
-            type="button"
-            className="btn"
-            style={{ padding: '6px 12px', height: '32px', fontSize: '0.75rem', background: '#f1f5f9', color: '#475569', borderRadius: '8px' }}
-            onClick={() => {
-              const newKey = prompt("أدخل مفتاح API الجديد لـ Gemini:", aiApiKey);
-              if (newKey !== null) {
-                saveModalApiKey(newKey);
-              }
-            }}
-          >
-            تعديل مفتاح API
-          </button>
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+            {geminiKeyManager.count()} {geminiKeyManager.count() === 1 ? 'مفتاح' : 'مفاتيح'} نشطة
+          </span>
         </div>
 
         {aiError && (
@@ -1233,21 +1344,101 @@ Return JSON in this format:
     );
   };
 
+  const initiateDelete = (medId: number) => {
+    setConfirmDeleteId(medId);
+    setTimeout(() => {
+      setConfirmDeleteId(prev => prev === medId ? null : prev);
+    }, 4000); // Auto reset after 4 seconds
+  };
+
+  const handleDeleteMedicine = async (medId: number) => {
+    try {
+      const db = await getDb();
+      await db.execute("DELETE FROM medicine_writeoffs WHERE medicine_id = $1", [medId]);
+      await db.execute("DELETE FROM medicine_batches WHERE medicine_id = $1", [medId]);
+      await db.execute("DELETE FROM sale_items WHERE medicine_id = $1", [medId]);
+      await db.execute("DELETE FROM medicines WHERE id = $1", [medId]);
+      
+      setConfirmDeleteId(null);
+      fetchInventory();
+      showToast("تم حذف الدواء وجميع بياناته بنجاح", "success");
+    } catch (err: any) {
+      console.error(err);
+      showToast("فشل في حذف الدواء: " + err.message, "error");
+    }
+  };
+
   const handleFormSubmit = async (formData: any) => {
     const db = await getDb();
     const barcodeVal = sanitizeBarcode(formData.barcode);
 
+    let scientificName = formData.scientific_name;
+    if (!scientificName || !scientificName.trim()) {
+      scientificName = await fetchScientificName(formData.name, formData.description);
+    }
+
     if (editingMedicine) {
       await db.execute(
         "UPDATE medicines SET name = $1, category_id = $2, stock = $3, price = $4, barcode = $5, expiry_date = $6, description = $7, tax_rate = $8, scientific_name = $9, min_stock_level = $10, purchase_price = $11 WHERE id = $12",
-        [formData.name, formData.category_id, formData.stock, formData.price, barcodeVal, formData.expiry_date, formData.description, formData.tax_rate, formData.scientific_name, formData.min_stock_level, formData.purchase_price, editingMedicine.id]
+        [formData.name, formData.category_id, formData.stock, formData.price, barcodeVal, formData.expiry_date, formData.description, formData.tax_rate, scientificName, formData.min_stock_level, formData.purchase_price, editingMedicine.id]
       );
-      // Optional: Update the oldest active batch if it's a simple edit? 
-      // For now, simple editing updates the summary.
+
+      // Sync active batches to ensure POS and report modules use the correct, updated prices/costs
+      const activeBatches = await db.select<any[]>(
+        "SELECT * FROM medicine_batches WHERE medicine_id = $1 AND quantity > 0 ORDER BY expiry_date ASC",
+        [editingMedicine.id]
+      );
+
+      if (activeBatches.length === 0) {
+        // If stock was edited to be greater than 0, create an initial batch
+        if (formData.stock > 0) {
+          await db.execute(
+            "INSERT INTO medicine_batches (medicine_id, quantity, expiry_date, purchase_price, selling_price) VALUES ($1, $2, $3, $4, $5)",
+            [editingMedicine.id, formData.stock, formData.expiry_date, formData.purchase_price, formData.price]
+          );
+        }
+      } else {
+        // 1. Always update selling_price and purchase_price for all active batches
+        await db.execute(
+          "UPDATE medicine_batches SET purchase_price = $1, selling_price = $2 WHERE medicine_id = $3 AND quantity > 0",
+          [formData.purchase_price, formData.price, editingMedicine.id]
+        );
+
+        // 2. Sync expiry date for the oldest active batch
+        await db.execute(
+          "UPDATE medicine_batches SET expiry_date = $1 WHERE id = $2",
+          [formData.expiry_date, activeBatches[0].id]
+        );
+
+        // 3. Adjust batch quantities so their sum equals the new total stock
+        const currentTotal = activeBatches.reduce((sum, b) => sum + b.quantity, 0);
+        if (formData.stock !== currentTotal) {
+          if (formData.stock > currentTotal) {
+            // Increase: add the difference to the oldest active batch
+            const diff = formData.stock - currentTotal;
+            await db.execute(
+              "UPDATE medicine_batches SET quantity = quantity + $1 WHERE id = $2",
+              [diff, activeBatches[0].id]
+            );
+          } else {
+            // Decrease: deduct difference starting from the oldest active batch
+            let remainingToDeduct = currentTotal - formData.stock;
+            for (const batch of activeBatches) {
+              if (remainingToDeduct <= 0) break;
+              const deduct = Math.min(batch.quantity, remainingToDeduct);
+              await db.execute(
+                "UPDATE medicine_batches SET quantity = quantity - $1 WHERE id = $2",
+                [deduct, batch.id]
+              );
+              remainingToDeduct -= deduct;
+            }
+          }
+        }
+      }
     } else {
       const result = await db.execute(
         "INSERT INTO medicines (name, category_id, stock, price, barcode, expiry_date, description, tax_rate, scientific_name, min_stock_level, purchase_price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
-        [formData.name, formData.category_id, formData.stock, formData.price, barcodeVal, formData.expiry_date, formData.description, formData.tax_rate, formData.scientific_name, formData.min_stock_level, formData.purchase_price]
+        [formData.name, formData.category_id, formData.stock, formData.price, barcodeVal, formData.expiry_date, formData.description, formData.tax_rate, scientificName, formData.min_stock_level, formData.purchase_price]
       );
       const medicineId = result.lastInsertId;
       
@@ -1418,6 +1609,30 @@ Return JSON in this format:
           >
             <Sparkles size={20} /> إضافة بالذكاء الاصطناعي
           </button>
+          <button 
+            className="btn" 
+            style={{ 
+              background: '#ffffff', 
+              border: '2px solid #cbd5e1', 
+              color: '#334155', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              fontWeight: 700,
+              transition: 'all 0.2s ease'
+            }} 
+            onClick={openFetchScientificModal}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = 'var(--primary)';
+              e.currentTarget.style.color = 'var(--primary)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.color = '#334155';
+            }}
+          >
+            <Brain size={20} /> جلب الاسم العلمي
+          </button>
           <button className="btn btn-primary" onClick={() => { setEditingMedicine(null); setIsModalOpen(true); }}>
             <Plus size={20} /> إضافة دواء جديد
           </button>
@@ -1456,6 +1671,7 @@ Return JSON in this format:
         <table>
           <thead>
             <tr>
+              <th style={{ width: '60px' }}></th>
               <th>اسم الدواء</th>
               <th>الفئة</th>
               <th>الكمية</th>
@@ -1466,82 +1682,277 @@ Return JSON in this format:
             </tr>
           </thead>
           <tbody>
-            {filteredMedicines.map(med => (
-              <tr key={med.id}>
-                <td>
-                  <div style={{ fontWeight: 600 }}>{med.name}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 500 }}>{med.scientific_name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{med.barcode ? med.barcode : "none"}</div>
-                </td>
-                <td>{med.category_name}</td>
-                <td style={{ fontWeight: 600 }}>{med.stock}</td>
-                <td>{med.price.toLocaleString('en-US')} د.ع</td>
-                <td>{med.expiry_date}</td>
-                <td>
-                  <span className={`badge ${med.stock > (med.min_stock_level || 5) ? 'badge-primary' : med.stock > 0 ? 'badge-secondary' : 'badge-error'}`}>
-                    <span className="badge-dot" style={{ background: med.stock > (med.min_stock_level || 5) ? 'var(--primary)' : med.stock > 0 ? 'var(--secondary)' : 'var(--error)' }}></span>
-                    {med.stock > (med.min_stock_level || 5) ? 'متوفر' : med.stock > 0 ? 'منخفض' : 'ناقص'}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                    <button 
-                      className="btn-icon" 
-                      style={{ 
-                        width: '38px', 
-                        height: '38px', 
-                        borderRadius: '50%',
-                        background: '#f8fafc',
-                        color: 'var(--secondary)',
-                        border: '1px solid #e2e8f0',
-                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }} 
-                      onClick={() => { setEditingMedicine(med); setIsModalOpen(true); }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background = 'var(--secondary)';
-                        e.currentTarget.style.color = 'white';
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(48, 94, 163, 0.2)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = '#f8fafc';
-                        e.currentTarget.style.color = 'var(--secondary)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                    >
-                      <Edit2 size={16} strokeWidth={2.5} />
-                    </button>
-                    <button 
-                      className="btn-icon" 
-                      title="إتلاف / استبعاد"
-                      style={{ 
-                        width: '38px', 
-                        height: '38px', 
-                        borderRadius: '50%',
-                        background: '#fef3c7',
-                        color: '#92400e',
-                        border: '1px solid #fcd34d',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }} 
-                      onClick={() => { 
-                        setWriteoffData({ medicine_id: med.id, batch_id: 0, quantity: 0, reason: "Expired" });
-                        fetchBatches(med.id);
-                        setIsWriteoffOpen(true);
-                      }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {filteredMedicines.map(med => {
+              const isExpanded = expandedMedId === med.id;
+              return (
+                <Fragment key={med.id}>
+                  <tr onClick={() => toggleExpand(med.id)} style={{ cursor: 'pointer', background: isExpanded ? 'rgba(13, 148, 136, 0.02)' : 'transparent' }}>
+                    <td onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
+                      <button 
+                        type="button"
+                        className="btn-eye-modern" 
+                        onClick={() => toggleExpand(med.id)}
+                        style={{ color: isExpanded ? 'var(--primary)' : 'var(--text-slate)' }}
+                      >
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </button>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{med.name}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 500 }}>{med.scientific_name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{med.barcode ? med.barcode : "none"}</div>
+                    </td>
+                    <td>{med.category_name}</td>
+                    <td style={{ fontWeight: 600 }}>{med.stock}</td>
+                    <td>{med.price.toLocaleString('en-US')} د.ع</td>
+                    <td>{med.expiry_date}</td>
+                    <td>
+                      <span className={`badge ${med.stock > (med.min_stock_level || 5) ? 'badge-primary' : med.stock > 0 ? 'badge-secondary' : 'badge-error'}`}>
+                        <span className="badge-dot" style={{ background: med.stock > (med.min_stock_level || 5) ? 'var(--primary)' : med.stock > 0 ? 'var(--secondary)' : 'var(--error)' }}></span>
+                        {med.stock > (med.min_stock_level || 5) ? 'متوفر' : med.stock > 0 ? 'منخفض' : 'ناقص'}
+                      </span>
+                    </td>
+                    <td onClick={e => e.stopPropagation()}>
+                      {currentUser?.role === 'admin' ? (
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center' }}>
+                          {confirmDeleteId === med.id ? (
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <button 
+                                className="btn"
+                                style={{ 
+                                  background: '#ef4444', 
+                                  color: 'white', 
+                                  border: 'none', 
+                                  padding: '4px 10px', 
+                                  borderRadius: '8px', 
+                                  fontSize: '0.75rem', 
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  height: '32px'
+                                }}
+                                onClick={() => handleDeleteMedicine(med.id)}
+                              >
+                                تأكيد
+                              </button>
+                              <button 
+                                className="btn"
+                                style={{ 
+                                  background: '#e2e8f0', 
+                                  color: '#475569', 
+                                  border: 'none', 
+                                  padding: '4px 10px', 
+                                  borderRadius: '8px', 
+                                  fontSize: '0.75rem', 
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  height: '32px'
+                                }}
+                                onClick={() => setConfirmDeleteId(null)}
+                              >
+                                إلغاء
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              {currentUser?.role === 'admin' && (
+                                <button 
+                                  className="btn-icon" 
+                                  style={{ 
+                                    width: '38px', 
+                                    height: '38px', 
+                                    borderRadius: '50%',
+                                    background: '#f8fafc',
+                                    color: 'var(--secondary)',
+                                    border: '1px solid #e2e8f0',
+                                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }} 
+                                  onClick={() => { setEditingMedicine(med); setIsModalOpen(true); }}
+                                  onMouseOver={(e) => {
+                                    e.currentTarget.style.background = 'var(--secondary)';
+                                    e.currentTarget.style.color = 'white';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(48, 94, 163, 0.2)';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    e.currentTarget.style.background = '#f8fafc';
+                                    e.currentTarget.style.color = 'var(--secondary)';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                  }}
+                                >
+                                  <Edit2 size={16} strokeWidth={2.5} />
+                                </button>
+                              )}
+                              <button 
+                                className="btn-icon" 
+                                title="إتلاف / استبعاد"
+                                style={{ 
+                                  width: '38px', 
+                                  height: '38px', 
+                                  borderRadius: '50%',
+                                  background: '#fef3c7',
+                                  color: '#92400e',
+                                  border: '1px solid #fcd34d',
+                                  transition: 'all 0.2s',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }} 
+                                onClick={() => { 
+                                  setWriteoffData({ medicine_id: med.id, batch_id: 0, quantity: 0, reason: "Expired" });
+                                  fetchBatches(med.id);
+                                  setIsWriteoffOpen(true);
+                                }}
+                              >
+                                <AlertTriangle size={16} />
+                              </button>
+                              {currentUser?.role === 'admin' && (
+                                <button 
+                                  className="btn-icon" 
+                                  title="حذف نهائي"
+                                  style={{ 
+                                    width: '38px', 
+                                    height: '38px', 
+                                    borderRadius: '50%',
+                                    background: '#fee2e2',
+                                    color: '#ef4444',
+                                    border: '1px solid #fca5a5',
+                                    transition: 'all 0.2s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }} 
+                                  onClick={() => initiateDelete(med.id)}
+                                  onMouseOver={(e) => {
+                                    e.currentTarget.style.background = '#ef4444';
+                                    e.currentTarget.style.color = 'white';
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    e.currentTarget.style.background = '#fee2e2';
+                                    e.currentTarget.style.color = '#ef4444';
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                  }}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem', fontWeight: 600 }}>مغلق</div>
+                      )}
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr style={{ background: '#f8fafc' }}>
+                      <td colSpan={8} style={{ padding: '20px 32px', borderBottom: '1px solid var(--border)' }}>
+                        <div style={{ 
+                          background: 'white', 
+                          borderRadius: '16px', 
+                          padding: '20px', 
+                          border: '1px solid var(--border)',
+                          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
+                        }}>
+                          <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
+                            📦 جميع الوجبات (Batches)
+                          </h4>
+                          {loadingBatches === med.id ? (
+                            <div style={{ padding: '10px', color: 'var(--text-slate)', fontSize: '0.85rem' }}>جاري تحميل الوجبات...</div>
+                          ) : !medicineBatches[med.id] || medicineBatches[med.id].length === 0 ? (
+                            <div style={{ padding: '10px', color: 'var(--text-slate)', fontSize: '0.85rem' }}>لا توجد وجبات مسجلة لهذا الدواء بعد.</div>
+                          ) : (
+                            <table style={{ margin: 0, width: '100%', border: 'none' }}>
+                              <thead style={{ background: '#f1f5f9' }}>
+                                <tr style={{ background: 'transparent' }}>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الوجبة</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>تاريخ الصلاحية</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الكمية المتوفرة</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>سعر الشراء للقطعة</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>سعر البيع للوجبة</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>تاريخ الإدخال</th>
+                                  {currentUser?.role === 'admin' && (
+                                    <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>إجراءات</th>
+                                  )}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {medicineBatches[med.id].map((batch, index) => {
+                                  const expiry = new Date(batch.expiry_date);
+                                  const now = new Date();
+                                  const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                  
+                                  let rowOpacity = 1;
+                                  let badgeClass = 'badge-primary';
+                                  let statusText = 'صالحة';
+                                  if (batch.quantity === 0) {
+                                    badgeClass = 'badge-error';
+                                    statusText = 'مستهلكة';
+                                    rowOpacity = 0.45;
+                                  } else if (daysLeft < 0) {
+                                    badgeClass = 'badge-error';
+                                    statusText = 'منتهية';
+                                    rowOpacity = 0.6;
+                                  } else if (daysLeft <= 90) {
+                                    badgeClass = 'badge-secondary';
+                                    statusText = `تنتهي خلال ${daysLeft} يوم`;
+                                  }
+
+                                  return (
+                                    <tr key={batch.id} style={{ background: 'transparent', opacity: rowOpacity }}>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', borderBottom: '1px solid #f1f5f9' }}>وجبة #{index + 1}</td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', borderBottom: '1px solid #f1f5f9' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                          <span>{batch.expiry_date}</span>
+                                          <span className={`badge ${badgeClass}`} style={{ fontSize: '9px', padding: '2px 8px' }}>{statusText}</span>
+                                        </div>
+                                      </td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', fontWeight: 800, borderBottom: '1px solid #f1f5f9' }}>{batch.quantity} قطعة</td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', borderBottom: '1px solid #f1f5f9' }}>{batch.purchase_price.toLocaleString()} د.ع</td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', borderBottom: '1px solid #f1f5f9' }}>{batch.selling_price.toLocaleString()} د.ع</td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', color: '#94a3b8', borderBottom: '1px solid #f1f5f9' }}>{new Date(batch.created_at).toLocaleDateString()}</td>
+                                      {currentUser?.role === 'admin' && (
+                                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
+                                          <button 
+                                            type="button"
+                                            className="btn" 
+                                            style={{ 
+                                              padding: '4px 10px', 
+                                              fontSize: '0.75rem', 
+                                              background: '#fee2e2', 
+                                              color: '#dc2626', 
+                                              borderRadius: '8px',
+                                              fontWeight: 700,
+                                              cursor: 'pointer' 
+                                            }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setWriteoffData({ medicine_id: med.id, batch_id: batch.id, quantity: batch.quantity, reason: daysLeft < 0 ? "Expired" : "Damaged" });
+                                              setBatches([batch]);
+                                              setIsWriteoffOpen(true);
+                                            }}
+                                          >
+                                            إتلاف الوجبة
+                                          </button>
+                                        </td>
+                                      )}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1670,6 +2081,193 @@ Return JSON in this format:
         closeOnOverlayClick={false}
       >
         {renderAIModalContent()}
+      </Modal>
+
+      <Modal
+        isOpen={isFetchSciOpen}
+        onClose={() => {
+          if (!isFetchingSci) setIsFetchSciOpen(false);
+        }}
+        title="🤖 جلب الأسماء العلمية بالذكاء الاصطناعي"
+        maxWidth="800px"
+        closeOnOverlayClick={false}
+      >
+        <div style={{ padding: '8px', direction: 'rtl' }}>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            .spinner-small {
+              width: 16px;
+              height: 16px;
+              border: 2px solid #cbd5e1;
+              border-top: 2px solid #3b82f6;
+              border-radius: 50%;
+              animation: spin 0.8s linear infinite;
+            }
+          `}</style>
+
+
+          {/* Progress bar or fetch trigger */}
+          <div style={{ 
+            background: '#f8fafc', 
+            border: '1px solid #e2e8f0', 
+            borderRadius: '16px', 
+            padding: '16px', 
+            marginBottom: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>
+                عدد الأدوية المحددة: <span style={{ color: '#3b82f6' }}>{sciMeds.length}</span>
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {isFetchingSci && (
+                  <>
+                    <span style={{ color: '#64748b', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="spinner-small" style={{ display: 'inline-block' }}></span> جاري البحث والتخمين...
+                    </span>
+                    <button
+                      className="btn"
+                      onClick={() => { shouldStopRef.current = true; }}
+                      style={{ 
+                        padding: '8px 16px', 
+                        fontSize: '0.85rem', 
+                        background: '#fee2e2', 
+                        color: '#ef4444', 
+                        border: '1px solid #fca5a5',
+                        fontWeight: 700 
+                      }}
+                    >
+                      إيقاف البحث
+                    </button>
+                  </>
+                )}
+                {!isFetchingSci && sciMeds.length > 0 && !sciMeds.every(m => m.status === 'success') && (
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={startFetchingScientificNames}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    <Brain size={18} /> {sciProgress > 0 ? "استئناف الجلب" : "بدء الجلب بالذكاء الاصطناعي"}
+                  </button>
+                )}
+                {!isFetchingSci && sciMeds.length > 0 && sciMeds.every(m => m.status === 'success') && (
+                  <span style={{ color: '#10b981', fontWeight: 700, fontSize: '0.9rem' }}>
+                    اكتمل الجلب! يرجى مراجعة الأسماء وحفظها.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {sciProgress > 0 && (
+              <div>
+                <div style={{ 
+                  width: '100%', 
+                  background: '#e2e8f0', 
+                  borderRadius: '9999px', 
+                  height: '10px', 
+                  overflow: 'hidden' 
+                }}>
+                  <div style={{ 
+                    width: `${sciProgress}%`, 
+                    background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)', 
+                    height: '100%',
+                    transition: 'width 0.3s ease'
+                  }}></div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b', marginTop: '6px' }}>
+                  <span>{sciProgress}% مكتمل</span>
+                  <span>{sciMeds.filter(m => m.status === 'success').length} نجح | {sciMeds.filter(m => m.status === 'failed').length} فشل</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* List of medicines */}
+          <div style={{ 
+            maxHeight: '400px', 
+            overflowY: 'auto', 
+            border: '1px solid #e2e8f0', 
+            borderRadius: '16px', 
+            background: '#ffffff'
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>الدواء (الاسم التجاري)</th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>الوصف</th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#475569', width: '250px' }}>الاسم العلمي المستخرج</th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#475569', width: '80px', textAlign: 'center' }}>الحالة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sciMeds.map((med, idx) => (
+                  <tr key={med.id} style={{ borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
+                      {med.name}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '0.8rem', color: '#64748b', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {med.description || 'لا يوجد وصف'}
+                    </td>
+                    <td style={{ padding: '8px 16px' }}>
+                      <input
+                        type="text"
+                        className="input"
+                        style={{ 
+                          width: '100%', 
+                          height: '36px', 
+                          fontSize: '0.85rem', 
+                          padding: '0 8px', 
+                          background: med.status === 'loading' ? '#f8fafc' : '#ffffff',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '8px'
+                        }}
+                        disabled={isFetchingSci || med.status === 'loading'}
+                        placeholder={med.status === 'loading' ? "جاري الجلب..." : "الاسم العلمي"}
+                        value={med.scientific_name}
+                        onChange={(e) => {
+                          const updated = [...sciMeds];
+                          updated[idx].scientific_name = e.target.value;
+                          setSciMeds(updated);
+                        }}
+                      />
+                    </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      {med.status === 'idle' && <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>بانتظار البدء</span>}
+                      {med.status === 'loading' && <div style={{ display: 'flex', justifyContent: 'center' }}><span className="spinner-small"></span></div>}
+                      {med.status === 'success' && <Check size={18} style={{ color: '#10b981', display: 'inline-block' }} />}
+                      {med.status === 'failed' && <AlertTriangle size={18} style={{ color: '#ef4444', display: 'inline-block' }} />}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-start', gap: '12px', marginTop: '24px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={saveScientificNames}
+              disabled={isFetchingSci || sciMeds.filter(m => m.scientific_name.trim()).length === 0}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}
+            >
+              <Check size={18} /> حفظ الأسماء العلمية في قاعدة البيانات
+            </button>
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => setIsFetchSciOpen(false)}
+              disabled={isFetchingSci}
+              style={{ fontWeight: 700 }}
+            >
+              إلغاء
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {toastNotification && (

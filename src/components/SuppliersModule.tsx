@@ -19,7 +19,7 @@ import {
 import { getDb } from '../lib/db';
 import { Modal } from './Modal';
 
-export const SuppliersModule = ({ initialSearch = "" }: { initialSearch?: string }) => {
+export const SuppliersModule = ({ initialSearch = "", currentUser }: { initialSearch?: string, currentUser?: any }) => {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -266,8 +266,12 @@ export const SuppliersModule = ({ initialSearch = "" }: { initialSearch?: string
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="btn-icon" style={{ color: 'var(--secondary)' }} onClick={() => startEdit(sup)}><Edit2 size={16} /></button>
-                      <button className="btn-icon" style={{ color: 'var(--error)' }} onClick={() => handleDelete(sup.id)}><Trash2 size={16} /></button>
+                      {currentUser?.role === 'admin' && (
+                        <>
+                          <button className="btn-icon" style={{ color: 'var(--secondary)' }} onClick={() => startEdit(sup)}><Edit2 size={16} /></button>
+                          <button className="btn-icon" style={{ color: 'var(--error)' }} onClick={() => handleDelete(sup.id)}><Trash2 size={16} /></button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

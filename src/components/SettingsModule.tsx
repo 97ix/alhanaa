@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Save, User, Globe, Download, Upload, Trash2, Key } from 'lucide-react';
+import { Save, User, Globe, Download, Upload, Trash2, Key, Plus, Edit2, X, CheckCircle2, RotateCcw } from 'lucide-react';
+import { geminiKeyManager } from '../lib/geminiKeyManager';
 import { getDb, closeDb } from '../lib/db';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { copyFile } from '@tauri-apps/plugin-fs';
 import { appConfigDir, join } from '@tauri-apps/api/path';
+import { Modal } from './Modal';
 
-export const SettingsModule = () => {
+export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: any, onUserUpdate?: () => void }) => {
   const [pharmacyName, setPharmacyName] = useState("صيدلية الهناء");
   const [address, setAddress] = useState("بغداد، العراق");
   const [phone, setPhone] = useState("07701234567");
@@ -13,11 +15,20 @@ export const SettingsModule = () => {
   const [userName, setUserName] = useState("د. أنس ثورن");
   const [userRole, setUserRole] = useState("صيدلي رئيسي");
   const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [geminiApiKeys, setGeminiApiKeys] = useState<string[]>([]);
+  const [newKeyInput, setNewKeyInput] = useState("");
   const [isSaved, setIsSaved] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [resetError, setResetError] = useState("");
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
+
+  // User Management State
+  const [users, setUsers] = useState<any[]>([]);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [userFormData, setUserFormData] = useState({ name: "", role: "cashier", pin: "" });
+
   const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'info';
     message: string;
@@ -28,6 +39,16 @@ export const SettingsModule = () => {
     setTimeout(() => {
       setNotification(null);
     }, 4500);
+  };
+
+  const fetchUsersList = async () => {
+    try {
+      const db = await getDb();
+      const result = await db.select<any[]>("SELECT * FROM users ORDER BY name ASC");
+      setUsers(result);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   useEffect(() => {
@@ -42,10 +63,89 @@ export const SettingsModule = () => {
             if (s.key === 'user_name') setUserName(s.value);
             if (s.key === 'user_role') setUserRole(s.value);
             if (s.key === 'gemini_api_key') setGeminiApiKey(s.value || "");
+            if (s.key === 'gemini_api_keys') {
+              try {
+                const parsed: string[] = JSON.parse(s.value || '[]');
+                setGeminiApiKeys(Array.isArray(parsed) ? parsed : []);
+              } catch (_) { setGeminiApiKeys([]); }
+            }
         });
+        await fetchUsersList();
     };
     fetchSettings();
   }, []);
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userFormData.name.trim() || !userFormData.pin.trim()) {
+      showNotification("يرجى إدخال اسم المستخدم ورمز PIN", "error");
+      return;
+    }
+    if (!/^\d+$/.test(userFormData.pin)) {
+      showNotification("رمز PIN يجب أن يتكون من أرقام فقط", "error");
+      return;
+    }
+    const db = await getDb();
+    try {
+      if (editingUser) {
+        const otherAdmins = users.filter(u => u.role === 'admin' && u.id !== editingUser.id);
+        if (editingUser.role === 'admin' && userFormData.role === 'cashier' && otherAdmins.length === 0) {
+          showNotification("لا يمكن تغيير دور المسؤول الوحيد في النظام", "error");
+          return;
+        }
+        await db.execute(
+          "UPDATE users SET name = $1, role = $2, pin = $3 WHERE id = $4",
+          [userFormData.name.trim(), userFormData.role, userFormData.pin, editingUser.id]
+        );
+        showNotification("تم تحديث بيانات المستخدم بنجاح!", "success");
+      } else {
+        await db.execute(
+          "INSERT INTO users (name, role, pin) VALUES ($1, $2, $3)",
+          [userFormData.name.trim(), userFormData.role, userFormData.pin]
+        );
+        showNotification("تمت إضافة المستخدم الجديد بنجاح!", "success");
+      }
+      setIsUserModalOpen(false);
+      setEditingUser(null);
+      setUserFormData({ name: "", role: "cashier", pin: "" });
+      await fetchUsersList();
+      if (onUserUpdate) onUserUpdate();
+    } catch (err: any) {
+      console.error(err);
+      showNotification("فشل حفظ المستخدم: قد يكون الاسم مستخدماً بالفعل", "error");
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    const userToDelete = users.find(u => u.id === userId);
+    if (!userToDelete) return;
+    
+    if (userToDelete.role === 'admin') {
+      const adminCount = users.filter(u => u.role === 'admin').length;
+      if (adminCount <= 1) {
+        showNotification("لا يمكن حذف المسؤول الوحيد في النظام. يجب أن يتوفر مسؤول واحد على الأقل.", "error");
+        return;
+      }
+    }
+
+    if (currentUser && currentUser.id === userId) {
+      showNotification("لا يمكنك حذف حسابك الحالي الذي تستخدمه لتسجيل الدخول", "error");
+      return;
+    }
+
+    if (!confirm(`هل أنت متأكد من حذف المستخدم "${userToDelete.name}" نهائياً؟`)) return;
+
+    const db = await getDb();
+    try {
+      await db.execute("DELETE FROM users WHERE id = $1", [userId]);
+      showNotification("تم حذف المستخدم بنجاح", "success");
+      await fetchUsersList();
+      if (onUserUpdate) onUserUpdate();
+    } catch (err) {
+      console.error(err);
+      showNotification("فشل في حذف المستخدم", "error");
+    }
+  };
 
   const handleSave = async () => {
     const db = await getDb();
@@ -55,7 +155,12 @@ export const SettingsModule = () => {
     await db.execute("UPDATE app_settings SET value = $1 WHERE key = 'pharmacy_phone'", [phone]);
     await db.execute("UPDATE app_settings SET value = $1 WHERE key = 'user_name'", [userName]);
     await db.execute("UPDATE app_settings SET value = $1 WHERE key = 'user_role'", [userRole]);
-    await db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('gemini_api_key', $1)", [geminiApiKey]);
+    // Save primary key (backward compat) + full key pool
+    const primaryKey = geminiApiKeys[0] || geminiApiKey;
+    await db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('gemini_api_key', $1)", [primaryKey]);
+    await db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('gemini_api_keys', $1)", [JSON.stringify(geminiApiKeys)]);
+    // Reload the key manager singleton so changes take effect immediately
+    await geminiKeyManager.load();
     
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
@@ -166,6 +271,15 @@ export const SettingsModule = () => {
     }
   };
 
+  if (currentUser?.role !== 'admin') {
+    return (
+      <div className="fade-in card" style={{ padding: '40px', textAlign: 'center', margin: '40px auto', maxWidth: '600px' }}>
+        <h2 style={{ color: 'var(--error)', marginBottom: '16px', fontWeight: 800 }}>عذراً، الوصول غير مصرح به</h2>
+        <p style={{ color: 'var(--text-muted)' }}>لا تملك صلاحيات كافية للوصول إلى صفحة الإعدادات. هذه الصفحة مخصصة للمسؤولين فقط.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ marginBottom: '32px' }}>
@@ -215,50 +329,192 @@ export const SettingsModule = () => {
         </div>
 
         <div className="card">
-          <h3 style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 800 }}>
-            <User size={20} color="var(--secondary)" /> الملف الشخصي للمستخدم
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'flex-end' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 800 }}>
-                {userName.split(' ').map(n => n[0]).join('')}
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 700, fontSize: '0.8rem' }}>اسم الصيدلي</label>
-                <input 
-                  className="input" style={{ width: '100%', background: '#f2f4f6', border: 'none', height: '40px' }}
-                  value={userName} onChange={e => setUserName(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '4px', fontWeight: 700, fontSize: '0.8rem' }}>الدور الوظيفي</label>
-              <input 
-                className="input" style={{ width: '100%', background: '#f2f4f6', border: 'none', height: '40px' }}
-                value={userRole} onChange={e => setUserRole(e.target.value)}
-              />
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 800 }}>
+              <User size={20} color="var(--secondary)" /> إدارة مستخدمي النظام
+            </h3>
+            <button 
+              type="button" 
+              className="btn btn-primary" 
+              style={{ padding: '8px 16px', borderRadius: '10px', fontSize: '0.85rem' }}
+              onClick={() => {
+                setEditingUser(null);
+                setUserFormData({ name: "", role: "cashier", pin: "" });
+                setIsUserModalOpen(true);
+              }}
+            >
+              <Plus size={16} /> إضافة مستخدم
+            </button>
           </div>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc' }}>
+                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الاسم الكامل</th>
+                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الدور الوظيفي</th>
+                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>رمز PIN</th>
+                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center', width: '120px' }}>خيارات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9', background: 'transparent' }}>
+                  <td style={{ padding: '12px 16px', fontSize: '0.9rem', fontWeight: 700 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem' }}>
+                        {u.name.charAt(0)}
+                      </div>
+                      <span>{u.name}</span>
+                      {currentUser && currentUser.id === u.id && (
+                        <span className="badge badge-primary" style={{ fontSize: '8px', padding: '1px 6px', marginRight: '6px' }}>أنت</span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                    <span className={`badge ${u.role === 'admin' ? 'badge-primary' : 'badge-secondary'}`}>
+                      {u.role === 'admin' ? 'صيدلي رئيسي' : 'مساعد صيدلي'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 16px', fontSize: '0.85rem', fontFamily: 'monospace', letterSpacing: '2px' }}>
+                    ••••
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      <button 
+                        type="button" 
+                        className="btn-icon" 
+                        title="تعديل" 
+                        style={{ color: 'var(--secondary)' }}
+                        onClick={() => {
+                          setEditingUser(u);
+                          setUserFormData({ name: u.name, role: u.role, pin: u.pin });
+                          setIsUserModalOpen(true);
+                        }}
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn-icon" 
+                        title="حذف" 
+                        style={{ color: 'var(--error)' }}
+                        onClick={() => handleDeleteUser(u.id)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
         <div className="card">
-          <h3 style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 800 }}>
+          <h3 style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 800 }}>
             <Key size={20} color="var(--primary)" /> إعدادات الذكاء الاصطناعي (Gemini API)
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>مفتاح Gemini API Key</label>
-              <input 
-                type="password"
-                placeholder="AIzaSy..." 
-                className="input" style={{ width: '100%', background: '#f2f4f6', border: 'none', height: '48px', fontFamily: 'monospace' }}
-                value={geminiApiKey} onChange={e => setGeminiApiKey(e.target.value)}
-              />
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '8px' }}>
-                * يُستخدم هذا المفتاح لتحليل صور قوائم الأدوية والفواتير آلياً باستخدام نموذج Gemini Flash. يتم حفظ المفتاح محلياً على جهازك فقط بشكل آمن.
-              </p>
-            </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-slate)', marginBottom: '24px' }}>
+            أضف حتى <strong>10 مفاتيح API</strong>. عند نفاد حصة أي مفتاح (رمز 429)، يتحول التطبيق تلقائياً للمفتاح التالي دون الحاجة للتدخل اليدوي.
+          </p>
+
+          {/* Key Pool List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+            {geminiApiKeys.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#94a3b8', fontSize: '0.875rem' }}>
+                لا توجد مفاتيح مضافة بعد. أضف مفتاحاً واحداً على الأقل لتفعيل الذكاء الاصطناعي.
+              </div>
+            )}
+            {geminiApiKeys.map((key, idx) => (
+              <div key={idx} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                background: idx === 0 ? 'rgba(13, 148, 136, 0.06)' : '#f8fafc',
+                border: idx === 0 ? '1px solid rgba(13, 148, 136, 0.3)' : '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '10px 16px'
+              }}>
+                {/* Index badge */}
+                <span style={{
+                  minWidth: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  background: idx === 0 ? 'var(--primary)' : '#e2e8f0',
+                  color: idx === 0 ? 'white' : '#64748b',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '0.75rem', fontWeight: 800
+                }}>{idx + 1}</span>
+
+                {/* Masked key */}
+                <span style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {key.slice(0, 8)}{'•'.repeat(Math.max(0, key.length - 12))}{key.slice(-4)}
+                </span>
+
+                {/* Active badge */}
+                {idx === 0 && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.7rem', fontWeight: 700, color: 'var(--primary)', background: 'rgba(13,148,136,0.1)', padding: '3px 8px', borderRadius: '99px', whiteSpace: 'nowrap' }}>
+                    <CheckCircle2 size={12} /> الكود الرئيسي
+                  </span>
+                )}
+
+                {/* Move to end (rotate down) */}
+                {geminiApiKeys.length > 1 && idx === 0 && (
+                  <button
+                    title="نقل لآخر القائمة"
+                    onClick={() => setGeminiApiKeys(prev => [...prev.slice(1), prev[0]])}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: '4px', borderRadius: '6px', display: 'flex' }}
+                  ><RotateCcw size={15} /></button>
+                )}
+
+                {/* Delete */}
+                <button
+                  title="حذف المفتاح"
+                  onClick={() => setGeminiApiKeys(prev => prev.filter((_, i) => i !== idx))}
+                  style={{ background: 'rgba(239,68,68,0.08)', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}
+                  onMouseOver={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.18)')}
+                  onMouseOut={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
+                ><X size={15} /></button>
+              </div>
+            ))}
           </div>
+
+          {/* Add new key row */}
+          {geminiApiKeys.length < 10 && (
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input
+                type="password"
+                placeholder="AIzaSy... (أدخل مفتاح Gemini API جديد)"
+                className="input"
+                style={{ flex: 1, background: '#f2f4f6', border: 'none', height: '48px', fontFamily: 'monospace' }}
+                value={newKeyInput}
+                onChange={e => setNewKeyInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && newKeyInput.trim()) {
+                    setGeminiApiKeys(prev => [...prev, newKeyInput.trim()]);
+                    setNewKeyInput('');
+                  }
+                }}
+              />
+              <button
+                className="btn btn-primary"
+                style={{ height: '48px', padding: '0 20px', whiteSpace: 'nowrap' }}
+                onClick={() => {
+                  if (!newKeyInput.trim()) return;
+                  setGeminiApiKeys(prev => [...prev, newKeyInput.trim()]);
+                  setNewKeyInput('');
+                }}
+              >
+                <Plus size={18} /> إضافة مفتاح
+              </button>
+            </div>
+          )}
+          {geminiApiKeys.length >= 10 && (
+            <p style={{ fontSize: '0.8rem', color: '#f59e0b', fontWeight: 700 }}>✓ وصلت للحد الأقصى (10 مفاتيح)</p>
+          )}
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '12px' }}>
+            * المفتاح رقم 1 هو الكود النشط. عند نفاد حصته يتحول التطبيق تلقائياً للتالي. يمكنك إعادة ترتيب الأولوية بالضغط على زر الدوران ↺.
+          </p>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
@@ -482,6 +738,79 @@ export const SettingsModule = () => {
           </div>
         </div>
       )}
+
+      <Modal
+        isOpen={isUserModalOpen}
+        onClose={() => {
+          setIsUserModalOpen(false);
+          setEditingUser(null);
+          setUserFormData({ name: "", role: "cashier", pin: "" });
+        }}
+        title={editingUser ? "تعديل بيانات المستخدم" : "إضافة مستخدم جديد"}
+      >
+        <form onSubmit={handleSaveUser} style={{ display: 'grid', gap: '20px', direction: 'rtl' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>الاسم الكامل</label>
+            <input 
+              className="input" 
+              style={{ width: '100%', background: '#f2f4f6', border: 'none', height: '48px' }}
+              value={userFormData.name} 
+              onChange={e => setUserFormData({ ...userFormData, name: e.target.value })}
+              placeholder="مثال: أحمد علي"
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>الدور الوظيفي</label>
+            <select 
+              className="input" 
+              style={{ width: '100%', height: '48px', background: '#f2f4f6', border: 'none' }}
+              value={userFormData.role} 
+              onChange={e => setUserFormData({ ...userFormData, role: e.target.value })}
+              required
+            >
+              <option value="cashier">مساعد صيدلي (كاشير)</option>
+              <option value="admin">صيدلي رئيسي (مسؤول)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>رمز PIN (أرقام فقط)</label>
+            <input 
+              type="password"
+              className="input" 
+              style={{ width: '100%', background: '#f2f4f6', border: 'none', height: '48px' }}
+              value={userFormData.pin} 
+              onChange={e => setUserFormData({ ...userFormData, pin: e.target.value })}
+              placeholder="رمز مرور رقمي يتكون من 4 إلى 6 أرقام"
+              required
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: '12px', justifyContent: 'flex-end' }}>
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              style={{ height: '48px', padding: '0 24px', fontWeight: 700 }}
+            >
+              حفظ
+            </button>
+            <button 
+              type="button" 
+              className="btn" 
+              style={{ height: '48px', padding: '0 24px', background: '#f2f4f6', fontWeight: 700 }}
+              onClick={() => {
+                setIsUserModalOpen(false);
+                setEditingUser(null);
+                setUserFormData({ name: "", role: "cashier", pin: "" });
+              }}
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {notification && (
         <div style={{

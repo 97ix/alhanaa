@@ -4,7 +4,7 @@ import { getDb } from '../lib/db';
 import { Customer } from '../types';
 import { Modal } from './Modal';
 
-export const CustomersModule = ({ initialSearch = "" }: { initialSearch?: string }) => {
+export const CustomersModule = ({ initialSearch = "", currentUser }: { initialSearch?: string, currentUser?: any }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,6 +15,7 @@ export const CustomersModule = ({ initialSearch = "" }: { initialSearch?: string
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
   const fetchCustomers = async () => {
     const db = await getDb();
@@ -79,6 +80,23 @@ export const CustomersModule = ({ initialSearch = "" }: { initialSearch?: string
     setTransactions(result);
     setSelectedCustomer(customer);
     setIsHistoryModalOpen(true);
+  };
+
+  const openPaymentModal = async (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setPaymentAmount(0);
+    setIsPaymentModalOpen(true);
+    setTransactions([]);
+    try {
+      const db = await getDb();
+      const result = await db.select<any[]>(
+        "SELECT * FROM customer_transactions WHERE customer_id = $1 ORDER BY created_at DESC",
+        [customer.id]
+      );
+      setTransactions(result);
+    } catch (e) {
+      console.error("Error loading transactions:", e);
+    }
   };
 
   const filteredCustomers = customers.filter(c => 
@@ -166,7 +184,7 @@ export const CustomersModule = ({ initialSearch = "" }: { initialSearch?: string
                     className="btn-icon" 
                     title="تسديد" 
                     style={{ background: 'var(--primary)', color: 'white', width: '32px', height: '32px', borderRadius: '8px', boxShadow: 'none', border: 'none' }}
-                    onClick={() => { setSelectedCustomer(customer); setIsPaymentModalOpen(true); }}
+                    onClick={() => openPaymentModal(customer)}
                   >
                     <Plus size={16} />
                   </button>
@@ -190,19 +208,15 @@ export const CustomersModule = ({ initialSearch = "" }: { initialSearch?: string
               >
                 <Edit2 size={16} /> تعديل
               </button>
-              <button 
-                className="btn" 
-                style={{ flex: 1, background: 'rgba(186, 26, 26, 0.05)', color: 'var(--error)', height: '40px', fontSize: '0.875rem', justifyContent: 'center' }}
-                onClick={async () => {
-                  if(confirm("هل أنت متأكد من حذف سجل المريض؟")) {
-                    const db = await getDb();
-                    await db.execute("DELETE FROM customers WHERE id = $1", [customer.id]);
-                    fetchCustomers();
-                  }
-                }}
-              >
-                <Trash2 size={16} /> حذف
-              </button>
+              {currentUser?.role === 'admin' && (
+                <button 
+                  className="btn" 
+                  style={{ flex: 1, background: 'rgba(186, 26, 26, 0.05)', color: 'var(--error)', height: '40px', fontSize: '0.875rem', justifyContent: 'center' }}
+                  onClick={() => setCustomerToDelete(customer)}
+                >
+                  <Trash2 size={16} /> حذف
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -260,6 +274,43 @@ export const CustomersModule = ({ initialSearch = "" }: { initialSearch?: string
           <button className="btn btn-primary" style={{ height: '56px', justifyContent: 'center' }}>
             تأكيد التسديد وتحديث الرصيد
           </button>
+          
+          {/* Previous Payments History */}
+          <div style={{ marginTop: '10px', borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              📜 الدفعات السابقة المستلمة
+            </h4>
+            <div style={{ maxHeight: '180px', overflowY: 'auto', background: '#f8fafc', borderRadius: '12px', padding: '12px' }}>
+              <table style={{ margin: 0, fontSize: '0.8rem', width: '100%' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={{ padding: '6px', textAlign: 'right' }}>التاريخ</th>
+                    <th style={{ padding: '6px', textAlign: 'right' }}>المبلغ</th>
+                    <th style={{ padding: '6px', textAlign: 'right' }}>التفاصيل</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.filter(t => t.type === 'payment').length > 0 ? (
+                    transactions.filter(t => t.type === 'payment').map(t => (
+                      <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px 6px' }}>{new Date(t.created_at).toLocaleDateString('ar-EG') || new Date(t.created_at).toLocaleDateString()}</td>
+                        <td style={{ padding: '8px 6px', fontWeight: 700, color: 'var(--primary)' }}>
+                          {t.amount.toLocaleString()} د.ع
+                        </td>
+                        <td style={{ padding: '8px 6px', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{t.description}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'center', padding: '16px', color: 'var(--text-muted)' }}>
+                        لا توجد دفعات سابقة مسجلة.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </form>
       </Modal>
 
@@ -297,6 +348,69 @@ export const CustomersModule = ({ initialSearch = "" }: { initialSearch?: string
             </tbody>
           </table>
         </div>
+      </Modal>
+
+      <Modal 
+        isOpen={customerToDelete !== null} 
+        onClose={() => setCustomerToDelete(null)} 
+        title="تأكيد حذف سجل المريض"
+      >
+        {customerToDelete && (
+          <div style={{ textAlign: 'center', padding: '8px' }}>
+            <div style={{ 
+              width: '64px', 
+              height: '64px', 
+              borderRadius: '50%', 
+              background: '#fee2e2', 
+              color: '#ef4444', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              margin: '0 auto 16px auto' 
+            }}>
+              <Trash2 size={32} />
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>هل أنت متأكد من الحذف؟</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '24px', lineHeight: '1.6' }}>
+              سيتم حذف سجل المريض <strong style={{ color: 'var(--text-slate)' }}>{customerToDelete.name}</strong> بالكامل، بما في ذلك جميع المعاملات المالية والديون المسجلة عليه. لا يمكن التراجع عن هذا الإجراء.
+            </p>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                type="button"
+                className="btn" 
+                style={{ flex: 1, background: '#f2f4f6', height: '48px', justifyContent: 'center', fontWeight: 700 }}
+                onClick={() => setCustomerToDelete(null)}
+              >
+                إلغاء
+              </button>
+              <button 
+                type="button"
+                className="btn" 
+                style={{ flex: 1, background: '#ef4444', color: 'white', height: '48px', justifyContent: 'center', fontWeight: 700 }}
+                onClick={async () => {
+                  try {
+                    const db = await getDb();
+                    // Set customer_id = NULL on sales first so we don't block deletion due to foreign key constraints
+                    await db.execute("UPDATE sales SET customer_id = NULL WHERE customer_id = $1", [customerToDelete.id]);
+                    // Delete transactions history
+                    await db.execute("DELETE FROM customer_transactions WHERE customer_id = $1", [customerToDelete.id]);
+                    // Delete the customer record itself
+                    await db.execute("DELETE FROM customers WHERE id = $1", [customerToDelete.id]);
+                    
+                    setCustomerToDelete(null);
+                    fetchCustomers();
+                  } catch (error: any) {
+                    console.error("Error deleting customer:", error);
+                    alert("حدث خطأ أثناء حذف المريض: " + (error.message || error));
+                  }
+                }}
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

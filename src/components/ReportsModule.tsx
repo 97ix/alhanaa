@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getDb } from '../lib/db';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, Legend, AreaChart, Area 
 } from 'recharts';
 import { ExpensesModule } from './ExpensesModule';
@@ -169,24 +169,62 @@ export const ReportsModule = () => {
             </div>
 
             <div className="card" style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ marginBottom: '20px', fontSize: '1rem', fontWeight: 800 }}>
-                 🏆 الأكثر مبيعاً (كمية)
+              <h3 style={{ marginBottom: '16px', fontSize: '1rem', fontWeight: 800 }}>
+                🏆 الأكثر مبيعاً (كمية)
               </h3>
-              <div style={{ flex: 1, width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topProducts} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                    <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={80} tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} />
-                    <Tooltip 
-                      cursor={{ fill: 'rgba(241, 107, 72, 0.05)' }}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                    />
-                    <Bar dataKey="value" name="الكمية" fill="var(--secondary)" radius={[0, 4, 4, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '9px' }}>
+                {topProducts.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>لا توجد بيانات مبيعات بعد</p>
+                ) : (() => {
+                  const maxVal = topProducts[0]?.value || 1;
+                  const rankConfig = [
+                    { medal: '🥇', bg: 'linear-gradient(135deg,#fef9c3,#fde68a)', border: '#f59e0b', bar: 'linear-gradient(90deg,#f59e0b,#fbbf24)', badge: '#d97706' },
+                    { medal: '🥈', bg: 'linear-gradient(135deg,#f1f5f9,#e2e8f0)', border: '#94a3b8', bar: 'linear-gradient(90deg,#64748b,#94a3b8)', badge: '#475569' },
+                    { medal: '🥉', bg: 'linear-gradient(135deg,#fff7ed,#fed7aa)', border: '#fb923c', bar: 'linear-gradient(90deg,#f97316,#fb923c)', badge: '#ea580c' },
+                    { medal: '4', bg: '#f8fafc', border: '#e2e8f0', bar: 'linear-gradient(90deg,#0d9488,#14b8a6)', badge: '#0d9488' },
+                    { medal: '5', bg: '#f8fafc', border: '#e2e8f0', bar: 'linear-gradient(90deg,#8b5cf6,#a78bfa)', badge: '#7c3aed' },
+                  ];
+                  return topProducts.map((p: any, idx: number) => {
+                    const cfg = rankConfig[idx] || rankConfig[4];
+                    const pct = Math.round((p.value / maxVal) * 100);
+                    const isMedal = idx < 3;
+                    return (
+                      <div key={idx} style={{
+                        display: 'flex', flexDirection: 'column', gap: '6px',
+                        background: cfg.bg, border: `1.5px solid ${cfg.border}`,
+                        borderRadius: '14px', padding: '10px 14px',
+                        transition: 'transform 0.15s',
+                        cursor: 'default',
+                      }}
+                        onMouseOver={e => (e.currentTarget.style.transform = 'translateX(-3px)')}
+                        onMouseOut={e => (e.currentTarget.style.transform = 'translateX(0)')}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{
+                            fontSize: isMedal ? '1.25rem' : '0.72rem', fontWeight: 800,
+                            minWidth: '26px', height: '26px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: isMedal ? 'transparent' : cfg.badge,
+                            color: isMedal ? undefined : 'white',
+                            borderRadius: '7px',
+                          }}>{cfg.medal}</span>
+                          <span style={{ flex: 1, fontSize: '0.83rem', fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.name}
+                          </span>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: 'white', background: cfg.badge, padding: '3px 9px', borderRadius: '99px', whiteSpace: 'nowrap' }}>
+                            {Number(p.value).toLocaleString()} قطعة
+                          </span>
+                        </div>
+                        <div style={{ height: '5px', background: 'rgba(0,0,0,0.08)', borderRadius: '99px', overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: cfg.bar, borderRadius: '99px', transition: 'width 0.6s cubic-bezier(.4,0,.2,1)' }} />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
+
           </div>
         </>
       ) : (

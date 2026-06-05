@@ -174,6 +174,7 @@ export async function initDb() {
     await database.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('pharmacy_phone', '07701234567')");
     await database.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('user_name', 'د. أنس ثورن')");
     await database.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('user_role', 'صيدلي رئيسي')");
+    await database.execute("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('gemini_api_keys', '[]')");
 
     // Migration: Add new columns to medicines if they don't exist
     try { await database.execute("ALTER TABLE medicines ADD COLUMN scientific_name TEXT"); } catch (e) {}
@@ -247,7 +248,33 @@ export async function initDb() {
       await database.execute("INSERT INTO categories (name) VALUES ('Antibiotics'), ('Painkillers'), ('Vitamins'), ('First Aid'), ('General')");
     }
 
-    console.log("Categories checked");
+    // NEW MIGRATION: Users System
+    await database.execute(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        role TEXT NOT NULL,
+        pin TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Migrate app_settings user to users table if empty
+    const countUsers = await database.select<any[]>("SELECT COUNT(*) as count FROM users");
+    if (countUsers[0].count === 0) {
+      console.log("Migrating app_settings user to users table...");
+      const nameRes = await database.select<any[]>("SELECT value FROM app_settings WHERE key = 'user_name'");
+      const roleRes = await database.select<any[]>("SELECT value FROM app_settings WHERE key = 'user_role'");
+      const name = nameRes[0]?.value || "د. أنس ثورن";
+      const roleText = roleRes[0]?.value || "صيدلي رئيسي";
+      const role = (roleText === "صيدلي رئيسي" || roleText.toLowerCase() === "admin") ? "admin" : "cashier";
+      await database.execute(
+        "INSERT INTO users (name, role, pin) VALUES ($1, $2, $3)",
+        [name, role, "1234"]
+      );
+    }
+
+    console.log("Categories and Users checked");
     return database;
   } catch (err) {
     console.error("Database Init Failed:", err);
