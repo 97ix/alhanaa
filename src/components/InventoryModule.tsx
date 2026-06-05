@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
+import { triggerToast } from '../lib/toast';
 import { Plus, Edit2, Trash2, Search, ScanBarcode, Camera, ShoppingCart, Sparkles, Upload, Brain, Check, AlertTriangle, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { getDb } from '../lib/db';
 import { geminiKeyManager } from '../lib/geminiKeyManager';
@@ -495,7 +496,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
 
   const startFetchingScientificNames = async () => {
     if (!geminiKeyManager.hasKeys()) {
-      alert("يرجى إضافة مفتاح Gemini API أولاً في صفحة الإعدادات لتتمكن من استخدام الذكاء الاصطناعي.");
+      triggerToast("يرجى إضافة مفتاح Gemini API أولاً في صفحة الإعدادات لتتمكن من استخدام الذكاء الاصطناعي.", "warning");
       return;
     }
     setIsFetchingSci(true);
@@ -1251,15 +1252,15 @@ Return JSON in this format:
               display: 'grid', 
               gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', 
               gap: '16px', 
-              background: '#f8fafc', 
+              background: 'var(--bg)', 
               padding: '20px', 
               borderRadius: '20px', 
-              border: '1px solid #e2e8f0',
+              border: '1px solid var(--border-color)',
               maxHeight: '360px',
               overflowY: 'auto'
             }}>
               {scannedImages.map((img) => (
-                <div key={img.id} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px', background: 'white', padding: '8px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                <div key={img.id} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--card-bg)', padding: '8px', borderRadius: '14px', border: '1px solid var(--border-color)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
                   <div style={{ position: 'relative', width: '100%', height: '100px', borderRadius: '8px', overflow: 'hidden' }}>
                     <img 
                       src={img.dataUrl} 
@@ -1314,7 +1315,7 @@ Return JSON in this format:
                   justifyContent: 'center', 
                   cursor: 'pointer', 
                   transition: 'all 0.2s', 
-                  background: 'white',
+                  background: 'var(--card-bg)',
                   gap: '8px'
                 }}
                 onMouseOver={(e) => {
@@ -1322,8 +1323,8 @@ Return JSON in this format:
                   e.currentTarget.style.background = 'rgba(59, 130, 246, 0.01)';
                 }}
                 onMouseOut={(e) => {
-                  e.currentTarget.style.borderColor = '#cbd5e1';
-                  e.currentTarget.style.background = 'white';
+                  e.currentTarget.style.borderColor = 'var(--border-color)';
+                  e.currentTarget.style.background = 'var(--card-bg)';
                 }}
               >
                 <Plus size={20} style={{ color: '#64748b' }} />
@@ -1492,13 +1493,13 @@ Return JSON in this format:
 
   return (
     <div className="fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
         <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 700 }}>المخزون</h2>
-          <p style={{ color: 'var(--text-muted)' }}>إدارة الأدوية والمستلزمات الطبية</p>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>المخزون</h2>
+          <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>إدارة الأدوية والمستلزمات الطبية</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '12px', marginRight: '12px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', background: 'var(--tab-bg)', padding: '4px', borderRadius: '12px' }}>
             <button 
               className={`btn ${activeFilter === '' ? 'btn-primary' : ''}`} 
               style={{ 
@@ -1508,14 +1509,16 @@ Return JSON in this format:
                 fontSize: '0.8rem',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                border: 'none',
+                boxShadow: 'none'
               }}
               onClick={() => setActiveFilter('')}
             >
               <span>الكل</span>
               <span style={{ 
-                background: activeFilter === '' ? 'rgba(255, 255, 255, 0.22)' : '#e2e8f0', 
-                color: activeFilter === '' ? 'white' : '#475569', 
+                background: activeFilter === '' ? 'rgba(255, 255, 255, 0.22)' : 'var(--bg)', 
+                color: activeFilter === '' ? 'white' : 'var(--text-slate)', 
                 padding: '2px 8px', 
                 borderRadius: '20px', 
                 fontSize: '0.75rem', 
@@ -1533,7 +1536,9 @@ Return JSON in this format:
                 fontSize: '0.8rem',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                border: 'none',
+                boxShadow: 'none'
               }}
               onClick={() => setActiveFilter('low_stock')}
             >
@@ -1541,10 +1546,10 @@ Return JSON in this format:
               <span style={{ 
                 background: activeFilter === 'low_stock' 
                   ? 'rgba(255, 255, 255, 0.22)' 
-                  : (totalLowStockCount > 0 ? '#fee2e2' : '#e2e8f0'), 
+                  : (totalLowStockCount > 0 ? 'var(--error-container)' : 'var(--bg)'), 
                 color: activeFilter === 'low_stock' 
                   ? 'white' 
-                  : (totalLowStockCount > 0 ? '#ef4444' : '#475569'), 
+                  : (totalLowStockCount > 0 ? 'var(--error)' : 'var(--text-slate)'), 
                 padding: '2px 8px', 
                 borderRadius: '20px', 
                 fontSize: '0.75rem', 
@@ -1562,7 +1567,9 @@ Return JSON in this format:
                 fontSize: '0.8rem',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                border: 'none',
+                boxShadow: 'none'
               }}
               onClick={() => setActiveFilter('expired')}
             >
@@ -1570,10 +1577,10 @@ Return JSON in this format:
               <span style={{ 
                 background: activeFilter === 'expired' 
                   ? 'rgba(255, 255, 255, 0.22)' 
-                  : (totalExpiredCount > 0 ? '#fee2e2' : '#e2e8f0'), 
+                  : (totalExpiredCount > 0 ? 'var(--error-container)' : 'var(--bg)'), 
                 color: activeFilter === 'expired' 
                   ? 'white' 
-                  : (totalExpiredCount > 0 ? '#ef4444' : '#475569'), 
+                  : (totalExpiredCount > 0 ? 'var(--error)' : 'var(--text-slate)'), 
                 padding: '2px 8px', 
                 borderRadius: '20px', 
                 fontSize: '0.75rem', 
@@ -1583,59 +1590,87 @@ Return JSON in this format:
               </span>
             </button>
           </div>
-          <button className="btn" style={{ background: 'var(--secondary)', color: 'white' }} onClick={() => setIsRestockOpen(true)}>
-            <ShoppingCart size={20} /> إضافة وجبة لشحنة موجودة
-          </button>
-          <button 
-            className="btn" 
-            style={{ 
-              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)', 
-              color: 'white', 
-              border: 'none',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }} 
-            onClick={() => setIsAIModalOpen(true)}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(139, 92, 246, 0.3)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            <Sparkles size={20} /> إضافة بالذكاء الاصطناعي
-          </button>
-          <button 
-            className="btn" 
-            style={{ 
-              background: '#ffffff', 
-              border: '2px solid #cbd5e1', 
-              color: '#334155', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              fontWeight: 700,
-              transition: 'all 0.2s ease'
-            }} 
-            onClick={openFetchScientificModal}
-            onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = 'var(--primary)';
-              e.currentTarget.style.color = 'var(--primary)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = '#cbd5e1';
-              e.currentTarget.style.color = '#334155';
-            }}
-          >
-            <Brain size={20} /> جلب الاسم العلمي
-          </button>
-          <button className="btn btn-primary" onClick={() => { setEditingMedicine(null); setIsModalOpen(true); }}>
-            <Plus size={20} /> إضافة دواء جديد
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'nowrap' }}>
+            <button 
+              className="btn" 
+              style={{ 
+                padding: '8px 12px', 
+                borderRadius: '8px', 
+                fontSize: '0.75rem', 
+                background: 'var(--secondary)', 
+                color: 'white', 
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '38px',
+                fontWeight: 700,
+                whiteSpace: 'nowrap'
+              }} 
+              onClick={() => setIsRestockOpen(true)}
+            >
+              <ShoppingCart size={15} /> إضافة وجبة لشحنة موجودة
+            </button>
+            <button 
+              className="btn" 
+              style={{ 
+                padding: '8px 12px', 
+                borderRadius: '8px', 
+                fontSize: '0.75rem', 
+                background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)', 
+                color: 'white', 
+                border: 'none',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                height: '38px',
+                fontWeight: 700,
+                whiteSpace: 'nowrap'
+              }} 
+              onClick={() => setIsAIModalOpen(true)}
+            >
+              <Sparkles size={15} /> إضافة بالذكاء الاصطناعي
+            </button>
+            <button 
+              className="btn" 
+              style={{ 
+                padding: '8px 12px', 
+                borderRadius: '8px', 
+                fontSize: '0.75rem', 
+                background: 'var(--card-bg)', 
+                border: '1.5px solid var(--border-color)', 
+                color: 'var(--text-slate)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                fontWeight: 700,
+                transition: 'all 0.2s ease',
+                height: '38px',
+                whiteSpace: 'nowrap'
+              }} 
+              onClick={openFetchScientificModal}
+            >
+              <Brain size={15} /> جلب الاسم العلمي
+            </button>
+            <button 
+              className="btn btn-primary" 
+              style={{
+                padding: '8px 12px', 
+                borderRadius: '8px', 
+                fontSize: '0.75rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px', 
+                height: '38px',
+                fontWeight: 700,
+                whiteSpace: 'nowrap'
+              }}
+              onClick={() => { setEditingMedicine(null); setIsModalOpen(true); }}
+            >
+              <Plus size={15} /> إضافة دواء جديد
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1677,7 +1712,6 @@ Return JSON in this format:
               <th>الكمية</th>
               <th>السعر</th>
               <th>تاريخ الانتهاء</th>
-              <th>الحالة</th>
               <th style={{ textAlign: 'center' }}>خيارات</th>
             </tr>
           </thead>
@@ -1706,12 +1740,6 @@ Return JSON in this format:
                     <td style={{ fontWeight: 600 }}>{med.stock}</td>
                     <td>{med.price.toLocaleString('en-US')} د.ع</td>
                     <td>{med.expiry_date}</td>
-                    <td>
-                      <span className={`badge ${med.stock > (med.min_stock_level || 5) ? 'badge-primary' : med.stock > 0 ? 'badge-secondary' : 'badge-error'}`}>
-                        <span className="badge-dot" style={{ background: med.stock > (med.min_stock_level || 5) ? 'var(--primary)' : med.stock > 0 ? 'var(--secondary)' : 'var(--error)' }}></span>
-                        {med.stock > (med.min_stock_level || 5) ? 'متوفر' : med.stock > 0 ? 'منخفض' : 'ناقص'}
-                      </span>
-                    </td>
                     <td onClick={e => e.stopPropagation()}>
                       {currentUser?.role === 'admin' ? (
                         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center' }}>
@@ -1849,10 +1877,10 @@ Return JSON in this format:
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr style={{ background: '#f8fafc' }}>
+                    <tr style={{ background: 'var(--bg)' }}>
                       <td colSpan={8} style={{ padding: '20px 32px', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ 
-                          background: 'white', 
+                          background: 'var(--card-bg)', 
                           borderRadius: '16px', 
                           padding: '20px', 
                           border: '1px solid var(--border)',
@@ -1982,7 +2010,7 @@ Return JSON in this format:
           onCancel={() => setIsRestockOpen(false)}
           onSubmit={async (data) => {
             if (data.medicine_id === 0 || data.quantity <= 0 || !data.expiry_date) {
-              alert("يرجى إكمال كافة البيانات بشكل صحيح");
+              triggerToast("يرجى إكمال كافة البيانات بشكل صحيح", "error");
               return;
             }
             const db = await getDb();
@@ -1999,7 +2027,7 @@ Return JSON in this format:
             
             setIsRestockOpen(false);
             fetchInventory();
-            alert("تمت إضافة الوجبة الجديدة وتحديث المخزون.");
+            triggerToast("تمت إضافة الوجبة الجديدة وتحديث المخزون.", "success");
           }}
         />
       </Modal>
@@ -2046,7 +2074,7 @@ Return JSON in this format:
             style={{ height: '56px', justifyContent: 'center', background: 'var(--error)' }}
             onClick={async () => {
               if (writeoffData.batch_id === 0 || writeoffData.quantity <= 0) {
-                alert("يرجى إكمال البيانات"); return;
+                triggerToast("يرجى إكمال البيانات", "error"); return;
               }
               const db = await getDb();
               // 1. Record write-off
@@ -2061,7 +2089,7 @@ Return JSON in this format:
               
               setIsWriteoffOpen(false);
               fetchInventory();
-              alert("تم تسجيل الإتلاف وتحديث المخزون");
+              triggerToast("تم تسجيل الإتلاف وتحديث المخزون", "success");
             }}
           >
             تأكيد الاستبعاد من المخزون
@@ -2191,17 +2219,17 @@ Return JSON in this format:
           <div style={{ 
             maxHeight: '400px', 
             overflowY: 'auto', 
-            border: '1px solid #e2e8f0', 
+            border: '1px solid var(--border-color)', 
             borderRadius: '16px', 
-            background: '#ffffff'
+            background: 'var(--card-bg)'
           }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>الدواء (الاسم التجاري)</th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#475569' }}>الوصف</th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#475569', width: '250px' }}>الاسم العلمي المستخرج</th>
-                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: '#475569', width: '80px', textAlign: 'center' }}>الحالة</th>
+                <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border-color)' }}>
+                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-slate)' }}>الدواء (الاسم التجاري)</th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-slate)' }}>الوصف</th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-slate)', width: '250px' }}>الاسم العلمي المستخرج</th>
+                  <th style={{ padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-slate)', width: '80px', textAlign: 'center' }}>الحالة</th>
                 </tr>
               </thead>
               <tbody>

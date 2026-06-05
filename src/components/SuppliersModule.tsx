@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { triggerToast } from '../lib/toast';
 import { 
   Users, 
   Plus, 
@@ -80,6 +81,7 @@ export const SuppliersModule = ({ initialSearch = "", currentUser }: { initialSe
       }
       
       setIsSuccess(true);
+      triggerToast(editingSupplier ? "تم تحديث بيانات المورد بنجاح!" : "تم إضافة المورد الجديد بنجاح!", "success");
       setTimeout(() => {
         setIsSuccess(false);
         setIsModalOpen(false);
@@ -89,17 +91,21 @@ export const SuppliersModule = ({ initialSearch = "", currentUser }: { initialSe
       }, 1000);
     } catch (err) {
       console.error("Failed to save supplier:", err);
+      triggerToast("حدث خطأ أثناء حفظ بيانات المورد", "error");
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("هل أنت متأكد من حذف هذا المورد؟ لا يمكن التراجع عن هذا الإجراء.")) return;
+    const confirmed = await (window as any).confirmDialog("هل أنت متأكد من حذف هذا المورد؟ لا يمكن التراجع عن هذا الإجراء.");
+    if (!confirmed) return;
     try {
       const db = await getDb();
       await db.execute("DELETE FROM suppliers WHERE id = $1", [id]);
+      triggerToast("تم حذف المورد بنجاح!", "success");
       fetchSuppliers();
     } catch (err) {
       console.error("Failed to delete supplier:", err);
+      triggerToast("حدث خطأ أثناء حذف المورد", "error");
     }
   };
 
@@ -123,19 +129,19 @@ export const SuppliersModule = ({ initialSearch = "", currentUser }: { initialSe
   return (
     <div className="fade-in">
       {/* Header Section */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '40px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '40px' }}>
         <div>
           <h2 style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-headline)' }}>إدارة الموردين والمذاخر</h2>
           <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>تتبع الحسابات، المديونيات، وحركات التوريد الخاصة بالصيدلية</p>
         </div>
         <button className="btn btn-primary" style={{ padding: '12px 28px' }} onClick={() => setIsModalOpen(true)}>
-          <Plus size={20} /> إضافة مورد جديد
+          <Plus size={18} /> إضافة مورد جديد
         </button>
       </div>
 
       {/* Bento Grid Stats */}
       <div className="dashboard-grid" style={{ marginBottom: '40px' }}>
-        <div className="metric-card" style={{ border: 'none', background: 'white' }}>
+        <div className="metric-card" style={{ border: 'none', background: 'var(--card-bg)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--text-slate)', fontWeight: 500 }}>إجمالي المديونية</span>
             <div style={{ padding: '8px', borderRadius: '10px', background: 'rgba(0, 100, 85, 0.1)', color: 'var(--primary)' }}>
@@ -148,7 +154,7 @@ export const SuppliersModule = ({ initialSearch = "", currentUser }: { initialSe
           </div>
         </div>
 
-        <div className="metric-card" style={{ border: 'none', background: 'white' }}>
+        <div className="metric-card" style={{ border: 'none', background: 'var(--card-bg)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--text-slate)', fontWeight: 500 }}>الموردين النشطين</span>
             <div style={{ padding: '8px', borderRadius: '10px', background: 'rgba(0, 98, 105, 0.1)', color: 'var(--tertiary)' }}>
@@ -161,7 +167,7 @@ export const SuppliersModule = ({ initialSearch = "", currentUser }: { initialSe
           </div>
         </div>
 
-        <div className="metric-card" style={{ border: 'none', background: 'white' }}>
+        <div className="metric-card" style={{ border: 'none', background: 'var(--card-bg)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--text-slate)', fontWeight: 500 }}>طلبات هذا الشهر</span>
             <div style={{ padding: '8px', borderRadius: '10px', background: 'rgba(48, 94, 163, 0.1)', color: 'var(--secondary)' }}>
@@ -174,7 +180,7 @@ export const SuppliersModule = ({ initialSearch = "", currentUser }: { initialSe
           </div>
         </div>
 
-        <div className="metric-card" style={{ border: 'none', background: 'white', borderBottom: '4px solid var(--error)' }}>
+        <div className="metric-card" style={{ border: 'none', background: 'var(--card-bg)', borderBottom: '4px solid var(--error)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <span style={{ fontSize: '0.875rem', color: 'var(--text-slate)', fontWeight: 500 }}>مدفوعات مستحقة</span>
             <div style={{ padding: '8px', borderRadius: '10px', background: 'rgba(186, 26, 26, 0.1)', color: 'var(--error)' }}>

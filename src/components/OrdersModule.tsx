@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { triggerToast } from '../lib/toast';
 import { ShoppingCart, History, Eye } from 'lucide-react';
 import { POSModule } from './POSModule';
 import { getDb } from '../lib/db';
@@ -118,7 +119,8 @@ export const OrdersModule = ({ posProps }: any) => {
 
   const processReturn = async () => {
     if (!selectedSale || selectedItemIds.length === 0) return;
-    if (!confirm(`سيتم استرجاع الكميات المحددة. هل أنت متأكد؟`)) return;
+    const confirmed = await (window as any).confirmDialog(`سيتم استرجاع الكميات المحددة. هل أنت متأكد؟`);
+    if (!confirmed) return;
 
     const db = await getDb();
     let actualRefundToUser = 0;
@@ -203,12 +205,12 @@ export const OrdersModule = ({ posProps }: any) => {
 
     setIsModalOpen(false);
     fetchSales();
-    alert("تم إجراء التعديلات واسترجاع الضريبة وتحديث حساب العميل / المبالغ المحددة.");
+    triggerToast("تم إجراء التعديلات واسترجاع الضريبة وتحديث حساب العميل / المبالغ المحددة.", "success");
   };
 
   return (
     <div className="fade-in">
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', background: 'var(--tab-bg)', padding: '6px', borderRadius: '16px', width: 'fit-content' }}>
         <button 
           onClick={() => setActiveSubTab('new')}
           className={`btn ${activeSubTab === 'new' ? 'btn-primary' : ''}`}
@@ -291,7 +293,7 @@ export const OrdersModule = ({ posProps }: any) => {
                     {sale.status === 'returned' ? (
                       <span className="badge badge-error">مسترجع كلياً</span>
                     ) : sale.status === 'partial_returned' ? (
-                      <span className="badge" style={{ background: '#fef3c7', color: '#92400e' }}>مسترجع جزئي</span>
+                      <span className="badge" style={{ background: 'var(--warning-container)', color: 'var(--warning)' }}>مسترجع جزئي</span>
                     ) : (
                       <span className="badge badge-success">مدفوعة ومكتملة</span>
                     )}
@@ -322,8 +324,8 @@ export const OrdersModule = ({ posProps }: any) => {
                   </div>
                 </div>
 
-                <div style={{ background: '#f8fafc', borderRadius: '16px', padding: '16px', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+                <div style={{ background: 'var(--bg)', borderRadius: '16px', padding: '16px', marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
                     <h4 style={{ fontSize: '0.9rem', opacity: 0.7 }}>الأدوية والمباعة:</h4>
                     <button onClick={toggleAllItems} style={{ background: 'transparent', border: 'none', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer', fontSize: '0.8rem' }}>
                       {selectedItemIds.length === saleItems.length ? 'إلغاء تحديد الكل' : 'تحديد الكل'}
@@ -335,7 +337,7 @@ export const OrdersModule = ({ posProps }: any) => {
                     const isSelected = selectedItemIds.includes(key);
                     return (
                       <div key={key} onClick={() => toggleItem(key)} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: isSelected ? 'rgba(13, 148, 136, 0.05)' : 'transparent', borderRadius: '12px', marginBottom: '4px', cursor: 'pointer' }}>
-                        <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${isSelected ? 'var(--primary)' : '#cbd5e1'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isSelected ? 'var(--primary)' : 'white' }}>
+                        <div style={{ width: '20px', height: '20px', borderRadius: '6px', border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--border-color)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isSelected ? 'var(--primary)' : 'var(--card-bg)' }}>
                           {isSelected && <div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'white' }} />}
                         </div>
                         <div style={{ flex: 1 }}>
@@ -346,9 +348,9 @@ export const OrdersModule = ({ posProps }: any) => {
                           {isSelected && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }} onClick={e => e.stopPropagation()}>
                               <span style={{ fontSize: '0.75rem' }}>الكمية المراد إرجاعها:</span>
-                              <button onClick={() => updateReturnQty(key, -1, item.quantity)} style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white' }}>-</button>
+                              <button onClick={() => updateReturnQty(key, -1, item.quantity)} style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg)', color: 'var(--text-main)', cursor: 'pointer' }}>-</button>
                               <span style={{ fontWeight: 800 }}>{returnQuantities[key] || 1}</span>
-                              <button onClick={() => updateReturnQty(key, 1, item.quantity)} style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid #cbd5e1', background: 'white' }}>+</button>
+                              <button onClick={() => updateReturnQty(key, 1, item.quantity)} style={{ width: '24px', height: '24px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg)', color: 'var(--text-main)', cursor: 'pointer' }}>+</button>
                             </div>
                           )}
                         </div>
@@ -366,14 +368,14 @@ export const OrdersModule = ({ posProps }: any) => {
                     );
                   })}
 
-                  <div style={{ marginTop: '16px', borderTop: '1px dashed #cbd5e1', paddingTop: '12px' }}>
+                  <div style={{ marginTop: '16px', borderTop: '1px dashed var(--border-color)', paddingTop: '12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <span>المجموع الكلي (قبل الخصم):</span>
                       <span>{Math.round(preDiscountTotal).toLocaleString()} د.ع</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                       <span>إجمالي الخصم بالفاتورة:</span>
-                      <span style={{ color: '#94a3b8' }}>- {selectedSale.discount?.toLocaleString()} د.ع</span>
+                      <span style={{ color: 'var(--text-muted)' }}>- {selectedSale.discount?.toLocaleString()} د.ع</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, fontSize: '1.1rem', marginTop: '8px', color: 'var(--primary)' }}>
                       <span>المبلغ الفعلي المدفوع:</span>
@@ -381,12 +383,12 @@ export const OrdersModule = ({ posProps }: any) => {
                     </div>
                     
                     {getLivePreview() > 0 && (
-                      <div style={{ marginTop: '20px', padding: '12px', background: '#fff1f2', borderRadius: '12px', border: '1px solid #fecdd3' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e11d48', fontWeight: 700, fontSize: '0.85rem' }}>
+                      <div style={{ marginTop: '20px', padding: '12px', background: 'var(--error-container)', borderRadius: '12px', border: '1.5px solid var(--border-color)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--error)', fontWeight: 700, fontSize: '0.85rem' }}>
                           <span>مبلغ الاسترجاع المستحق:</span>
                           <span>- {Math.round(getLivePreview()).toLocaleString()} د.ع</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, marginTop: '8px', borderTop: '1px solid rgba(225,29,72,0.1)', paddingTop: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 900, marginTop: '8px', borderTop: '1.5px solid var(--border-color)', paddingTop: '8px' }}>
                           <span>الرصيد المتبقي:</span>
                           <span>{Math.max(0, Math.round(selectedSale.total_amount - getLivePreview())).toLocaleString()} د.ع</span>
                         </div>

@@ -13,9 +13,11 @@ import {
   CheckCircle,
   LogOut,
   KeyRound,
-  Calendar
+  Calendar,
+  Sun,
+  Moon
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import "./App.css";
 import { initDb, getDb } from "./lib/db";
 import { InventoryModule } from "./components/InventoryModule";
@@ -137,12 +139,12 @@ const Dashboard = ({ onNavigate }: { onNavigate: (tab: string, filter?: string) 
             </div>
           </div>
            {stats.expiredCount > 0 ? (
-              <div style={{ padding: '24px', background: '#fff1f2', borderRadius: '16px', border: '1px solid #fecdd3', color: '#e11d48' }}>
+              <div style={{ padding: '24px', background: 'var(--error-container)', borderRadius: '16px', border: '1.5px solid var(--border-color)', color: 'var(--error)' }}>
                  <p style={{ fontWeight: 700 }}>يوجد {stats.expiredCount} عناصر أوشكت صلاحيتها على الانتهاء!</p>
-                 <button className="btn" onClick={() => onNavigate('inventory', 'expired')} style={{ marginTop: '16px', background: '#e11d48', color: 'white' }}>عرض القائمة الحرجة</button>
+                 <button className="btn" onClick={() => onNavigate('inventory', 'expired')} style={{ marginTop: '16px', background: 'var(--error)', color: 'white' }}>عرض القائمة الحرجة</button>
               </div>
            ) : (
-             <div style={{ padding: '40px', textAlign: 'center', background: '#f8fafc', borderRadius: '16px', border: '1px dashed var(--border)' }}>
+             <div style={{ padding: '40px', textAlign: 'center', background: 'var(--bg)', borderRadius: '16px', border: '1px dashed var(--border)' }}>
                 <CheckCircle size={32} color="var(--primary)" style={{ opacity: 0.3, marginBottom: '12px' }} />
                 <p style={{ fontWeight: 600, color: 'var(--text-slate)' }}>كل الأدوية صالحة وبحالة ممتازة.</p>
              </div>
@@ -248,63 +250,90 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
       width: '100vw',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-      color: '#1e293b',
+      background: 'radial-gradient(circle at center, var(--login-bg-start) 0%, var(--login-bg-end) 100%)',
+      color: 'var(--text-main)',
       fontFamily: 'var(--font-headline)',
       direction: 'rtl',
       position: 'fixed',
       top: 0,
       left: 0,
-      zIndex: 99999
+      zIndex: 99999,
+      overflow: 'hidden'
     }}>
+      {/* Decorative gradient glowing spots in background */}
+      <div style={{
+        position: 'absolute',
+        width: '350px',
+        height: '350px',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(20, 184, 166, 0.2) 0%, rgba(20, 184, 166, 0) 70%)',
+        top: '10%',
+        right: '15%',
+        zIndex: 1,
+        filter: 'blur(40px)'
+      }} />
+      <div style={{
+        position: 'absolute',
+        width: '400px',
+        height: '400px',
+        borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0) 70%)',
+        bottom: '10%',
+        left: '15%',
+        zIndex: 1,
+        filter: 'blur(50px)'
+      }} />
+
       <motion.div 
         animate={shake ? { x: [-10, 10, -10, 10, 0] } : {}}
         transition={{ duration: 0.4 }}
+        className="glass-panel"
         style={{
           width: '100%',
-          maxWidth: '420px',
-          background: 'white',
-          border: '1px solid #e2e8f0',
-          borderRadius: '28px',
-          padding: '40px 32px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
+          maxWidth: '430px',
+          borderRadius: '32px',
+          padding: '48px 36px',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center'
+          alignItems: 'center',
+          zIndex: 10,
+          border: '1px solid var(--login-glass-border)',
+          boxShadow: 'var(--login-glass-shadow)'
         }}
       >
         <div style={{
-          width: '64px',
-          height: '64px',
-          borderRadius: '20px',
-          background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%)',
+          width: '68px',
+          height: '68px',
+          borderRadius: '22px',
+          background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: '24px',
-          boxShadow: '0 0 20px rgba(13, 148, 136, 0.2)'
+          boxShadow: '0 8px 20px rgba(15, 118, 110, 0.3)'
         }}>
-          <KeyRound size={28} color="white" />
+          <KeyRound size={30} color="white" />
         </div>
 
-        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px', textAlign: 'center' }}>صيدلية الهناء</h2>
-        <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '32px', textAlign: 'center' }}>يرجى اختيار المستخدم وإدخال رمز PIN للدخول</p>
+        <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px', textAlign: 'center' }}>صيدلية الهناء</h2>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '32px', textAlign: 'center' }}>يرجى اختيار المستخدم وإدخال رمز PIN للدخول</p>
 
         <div style={{ width: '100%', marginBottom: '24px' }}>
-          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginBottom: '8px' }}>المستخدم</label>
+          <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-slate)', marginBottom: '8px' }}>المستخدم</label>
           <select 
             style={{
               width: '100%',
-              height: '50px',
-              background: '#f1f5f9',
-              border: '1px solid #cbd5e1',
-              borderRadius: '12px',
-              color: '#1e293b',
+              height: '52px',
+              background: 'var(--bg)',
+              border: '1.5px solid var(--border-color)',
+              borderRadius: '16px',
+              color: 'var(--text-main)',
               padding: '0 16px',
               fontWeight: 700,
               fontSize: '1rem',
               outline: 'none',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'all 0.25s ease'
             }}
             value={selectedUserId}
             onChange={(e) => {
@@ -314,37 +343,32 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
             }}
           >
             {users.map(u => (
-              <option key={u.id} value={u.id} style={{ background: 'white', color: '#1e293b' }}>
+              <option key={u.id} value={u.id} style={{ background: 'var(--card-bg)', color: 'var(--text-main)' }}>
                 {u.name} ({u.role === 'admin' ? 'صيدلي رئيسي' : 'مساعد صيدلي'})
               </option>
             ))}
           </select>
         </div>
 
-        <div style={{ display: 'flex', gap: '16px', margin: '16px 0 32px' }}>
+        <div style={{ display: 'flex', gap: '16px', margin: '16px 0 36px' }}>
           {[...Array(selectedUser?.pin?.length || 4)].map((_, i) => (
-            <div key={i} style={{
-              width: '16px',
-              height: '16px',
-              borderRadius: '50%',
-              border: '2px solid #cbd5e1',
-              background: i < pin.length ? 'var(--primary)' : 'transparent',
-              boxShadow: i < pin.length ? '0 0 8px var(--primary)' : 'none',
-              transition: 'all 0.15s ease'
-            }} />
+            <div 
+              key={i} 
+              className={`lock-screen-pin-dot ${i < pin.length ? 'filled' : ''}`} 
+            />
           ))}
         </div>
 
         {errorMsg && (
-          <p style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 700, marginBottom: '20px' }}>{errorMsg}</p>
+          <p style={{ color: 'var(--error)', fontSize: '0.875rem', fontWeight: 700, marginBottom: '24px' }}>{errorMsg}</p>
         )}
 
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: '16px',
+          gap: '20px 24px',
           width: '100%',
-          maxWidth: '280px',
+          maxWidth: '300px',
           marginBottom: '8px'
         }}>
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((num) => (
@@ -352,24 +376,7 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
               key={num}
               type="button"
               onClick={() => handleKeyPress(num)}
-              style={{
-                width: '64px',
-                height: '64px',
-                borderRadius: '50%',
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                color: '#1e293b',
-                fontSize: '1.25rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#f8fafc'}
+              className="lock-screen-btn"
             >
               {num}
             </button>
@@ -378,19 +385,17 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
             type="button"
             onClick={handleClear}
             style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
               background: 'transparent',
               border: 'none',
-              color: '#64748b',
-              fontSize: '0.9rem',
+              color: 'var(--text-muted)',
+              fontSize: '0.925rem',
               fontWeight: 700,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto'
+              margin: '0 auto',
+              outline: 'none'
             }}
           >
             مسح
@@ -398,23 +403,7 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
           <button
             type="button"
             onClick={() => handleKeyPress("0")}
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              color: '#1e293b',
-              fontSize: '1.25rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-            onMouseLeave={(e) => e.currentTarget.style.background = '#f8fafc'}
+            className="lock-screen-btn"
           >
             0
           </button>
@@ -422,19 +411,17 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
             type="button"
             onClick={handleBackspace}
             style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
               background: 'transparent',
               border: 'none',
-              color: '#64748b',
-              fontSize: '0.9rem',
+              color: 'var(--text-muted)',
+              fontSize: '0.925rem',
               fontWeight: 700,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto'
+              margin: '0 auto',
+              outline: 'none'
             }}
           >
             حذف
@@ -454,6 +441,59 @@ function App() {
   const [dbReady, setDbReady] = useState(false);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
+
+  // Added Theme State
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+
+  useEffect(() => {
+    if (theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  // Added Toast Notifications State
+  const [toasts, setToasts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const handleToastEvent = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const newToast = {
+        id: Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+        message: detail.message,
+        type: detail.type || 'success'
+      };
+      setToasts(prev => [...prev, newToast]);
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== newToast.id));
+      }, 4000);
+    };
+    window.addEventListener('app-toast', handleToastEvent);
+    return () => window.removeEventListener('app-toast', handleToastEvent);
+  }, []);
+
+  // Added custom Confirm Dialog State
+  const [confirmConfig, setConfirmConfig] = useState<{ message: string; onConfirm: () => void; resolve: (val: boolean) => void } | null>(null);
+
+  useEffect(() => {
+    (window as any).confirmDialog = (message: string): Promise<boolean> => {
+      return new Promise((resolve) => {
+        setConfirmConfig({
+          message,
+          onConfirm: () => {
+            setConfirmConfig(null);
+            resolve(true);
+          },
+          resolve: (val) => {
+            setConfirmConfig(null);
+            resolve(val);
+          }
+        });
+      });
+    };
+  }, []);
 
   const fetchUsers = async () => {
     try {
@@ -538,45 +578,132 @@ function App() {
           </div>
         </div>
         
-        <nav style={{ flex: 1 }}>
-          <div className={`sidebar-item ${activeTab === "dashboard" ? "active" : ""}`} onClick={() => setActiveTab("dashboard")}>
-            <LayoutDashboard size={20} />
-            لوحة التحكم
+        <nav style={{ flex: 1, position: 'relative' }}>
+          <div 
+            className={`sidebar-item ${activeTab === "dashboard" ? "active" : ""}`} 
+            onClick={() => setActiveTab("dashboard")}
+          >
+            {activeTab === "dashboard" && (
+              <motion.div 
+                layoutId="activeIndicator" 
+                className="sidebar-active-indicator" 
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            <LayoutDashboard size={20} style={{ position: 'relative', zIndex: 2 }} />
+            <span style={{ position: 'relative', zIndex: 2 }}>لوحة التحكم</span>
           </div>
-          <div className={`sidebar-item ${activeTab === "inventory" ? "active" : ""}`} onClick={() => { setActiveTab("inventory"); setInventoryFilter(""); }}>
-            <Package size={20} />
-            المخزون
+
+          <div 
+            className={`sidebar-item ${activeTab === "inventory" ? "active" : ""}`} 
+            onClick={() => { setActiveTab("inventory"); setInventoryFilter(""); }}
+          >
+            {activeTab === "inventory" && (
+              <motion.div 
+                layoutId="activeIndicator" 
+                className="sidebar-active-indicator" 
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            <Package size={20} style={{ position: 'relative', zIndex: 2 }} />
+            <span style={{ position: 'relative', zIndex: 2 }}>المخزون</span>
           </div>
-          <div className={`sidebar-item ${activeTab === "suppliers" ? "active" : ""}`} onClick={() => setActiveTab("suppliers")}>
-            <Truck size={20} />
-            الموردين والمذاخر
+
+          <div 
+            className={`sidebar-item ${activeTab === "suppliers" ? "active" : ""}`} 
+            onClick={() => setActiveTab("suppliers")}
+          >
+            {activeTab === "suppliers" && (
+              <motion.div 
+                layoutId="activeIndicator" 
+                className="sidebar-active-indicator" 
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            <Truck size={20} style={{ position: 'relative', zIndex: 2 }} />
+            <span style={{ position: 'relative', zIndex: 2 }}>الموردين والمذاخر</span>
           </div>
-          <div className={`sidebar-item ${activeTab === "pos" ? "active" : ""}`} onClick={() => setActiveTab("pos")}>
-            <ShoppingCart size={20} />
-            الطلبات
+
+          <div 
+            className={`sidebar-item ${activeTab === "pos" ? "active" : ""}`} 
+            onClick={() => setActiveTab("pos")}
+          >
+            {activeTab === "pos" && (
+              <motion.div 
+                layoutId="activeIndicator" 
+                className="sidebar-active-indicator" 
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            <ShoppingCart size={20} style={{ position: 'relative', zIndex: 2 }} />
+            <span style={{ position: 'relative', zIndex: 2 }}>الطلبات</span>
           </div>
+
           {currentUser.role === 'admin' && (
-            <div className={`sidebar-item ${activeTab === "reports" ? "active" : ""}`} onClick={() => setActiveTab("reports")}>
-              <TrendingUp size={20} />
-              التقارير المالية
+            <div 
+              className={`sidebar-item ${activeTab === "reports" ? "active" : ""}`} 
+              onClick={() => setActiveTab("reports")}
+            >
+              {activeTab === "reports" && (
+                <motion.div 
+                  layoutId="activeIndicator" 
+                  className="sidebar-active-indicator" 
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <TrendingUp size={20} style={{ position: 'relative', zIndex: 2 }} />
+              <span style={{ position: 'relative', zIndex: 2 }}>التقارير المالية</span>
             </div>
           )}
+
           {currentUser.role === 'admin' && (
-            <div className={`sidebar-item ${activeTab === "expiry" ? "active" : ""}`} onClick={() => setActiveTab("expiry")}>
-              <Calendar size={20} />
-              صلاحية الأدوية
+            <div 
+              className={`sidebar-item ${activeTab === "expiry" ? "active" : ""}`} 
+              onClick={() => setActiveTab("expiry")}
+            >
+              {activeTab === "expiry" && (
+                <motion.div 
+                  layoutId="activeIndicator" 
+                  className="sidebar-active-indicator" 
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <Calendar size={20} style={{ position: 'relative', zIndex: 2 }} />
+              <span style={{ position: 'relative', zIndex: 2 }}>صلاحية الأدوية</span>
             </div>
           )}
-          <div className={`sidebar-item ${activeTab === "customers" ? "active" : ""}`} onClick={() => setActiveTab("customers")}>
-            <Users size={20} />
-            المرضى
+
+          <div 
+            className={`sidebar-item ${activeTab === "customers" ? "active" : ""}`} 
+            onClick={() => setActiveTab("customers")}
+          >
+            {activeTab === "customers" && (
+              <motion.div 
+                layoutId="activeIndicator" 
+                className="sidebar-active-indicator" 
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            <Users size={20} style={{ position: 'relative', zIndex: 2 }} />
+            <span style={{ position: 'relative', zIndex: 2 }}>المرضى</span>
           </div>
         </nav>
 
         {currentUser.role === 'admin' && (
-          <div className={`sidebar-item ${activeTab === "settings" ? "active" : ""}`} onClick={() => setActiveTab("settings")} style={{ borderTop: '1px solid var(--border)', marginTop: '24px', paddingTop: '24px' }}>
-            <Settings size={20} />
-            الإعدادات
+          <div 
+            className={`sidebar-item ${activeTab === "settings" ? "active" : ""}`} 
+            onClick={() => setActiveTab("settings")} 
+            style={{ borderTop: '1px solid var(--border)', marginTop: '24px', paddingTop: '24px' }}
+          >
+            {activeTab === "settings" && (
+              <motion.div 
+                layoutId="activeIndicator" 
+                className="sidebar-active-indicator" 
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            <Settings size={20} style={{ position: 'relative', zIndex: 2 }} />
+            <span style={{ position: 'relative', zIndex: 2 }}>الإعدادات</span>
           </div>
         )}
 
@@ -597,17 +724,41 @@ function App() {
       </aside>
 
       <main className="main-content">
-        <header className="header" style={{ justifyContent: 'flex-end' }}>
-          
+        <header className="header" style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+          <div></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            {/* Theme Toggle Button */}
+            <button
+              onClick={() => setTheme(prev => prev === "light" ? "dark" : "light")}
+              className="btn-icon"
+              style={{
+                background: 'var(--card-bg)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'var(--text-main)',
+                transition: 'all 0.2s ease',
+                boxShadow: 'var(--shadow-sm)'
+              }}
+              title={theme === "light" ? "تفعيل الوضع الداكن" : "تفعيل الوضع الفاتح"}
+            >
+              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+
+            {/* Profile Section */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ textAlign: 'left' }}>
-                <p style={{ fontSize: '0.8125rem', fontWeight: 700 }}>{currentUser.name}</p>
-                <p style={{ fontSize: '0.625rem', color: 'var(--text-slate)', fontWeight: 600 }}>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: '0.875rem', fontWeight: 700 }}>{currentUser.name}</p>
+                <p style={{ fontSize: '0.675rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                   {currentUser.role === 'admin' ? 'صيدلي رئيسي' : 'مساعد صيدلي'}
                 </p>
               </div>
-              <div style={{ width: 40, height: 40, borderRadius: '12px', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '12px', background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, boxShadow: '0 4px 10px rgba(15, 118, 110, 0.15)' }}>
                 {currentUser.name.split(' ').map((n: string) => n[0]).join('')}
               </div>
             </div>
@@ -621,6 +772,116 @@ function App() {
         </section>
       </main>
 
+      {/* Toast Notifications container */}
+      <div 
+        className="toast-container" 
+        style={{ 
+          position: 'fixed', 
+          bottom: '24px', 
+          left: '24px', 
+          zIndex: 99999,
+          pointerEvents: 'none'
+        }}
+      >
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9, transition: { duration: 0.2 } }}
+              className={`toast toast-${t.type}`}
+              style={{ pointerEvents: 'auto' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                {t.type === 'success' && <CheckCircle size={18} />}
+                {t.type === 'error' && <AlertTriangle size={18} />}
+                {t.type === 'warning' && <AlertTriangle size={18} />}
+                <span style={{ flex: 1 }}>{t.message}</span>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Global Promise Confirm Modal */}
+      <AnimatePresence>
+        {confirmConfig && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99998,
+              backdropFilter: 'blur(8px)',
+              padding: '20px'
+            }}
+            onClick={() => confirmConfig.resolve(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 20, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              style={{
+                backgroundColor: 'var(--card-bg)',
+                borderRadius: 'var(--radius-xl)',
+                width: '100%',
+                maxWidth: '450px',
+                padding: '32px',
+                boxShadow: '0 25px 50px -12px rgba(15, 118, 110, 0.25), 0 0 0 1px rgba(15, 118, 110, 0.05)',
+                border: '1px solid var(--border-color)',
+                direction: 'rtl',
+                textAlign: 'right'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', color: 'var(--warning)' }}>
+                <AlertTriangle size={48} strokeWidth={1.5} />
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '16px', fontFamily: 'var(--font-headline)', textAlign: 'center' }}>
+                تأكيد العملية
+              </h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '28px', textAlign: 'center' }}>
+                {confirmConfig.message}
+              </p>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  onClick={confirmConfig.onConfirm}
+                  className="btn btn-primary"
+                  style={{ flex: 1, padding: '12px 24px', fontWeight: 700, borderRadius: '12px' }}
+                >
+                  نعم، استمر
+                </button>
+                <button
+                  onClick={() => confirmConfig.resolve(false)}
+                  className="btn"
+                  style={{ 
+                    flex: 1, 
+                    padding: '12px 24px', 
+                    fontWeight: 700, 
+                    borderRadius: '12px',
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-main)'
+                  }}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, ShoppingCart, Trash2, Plus, Minus, User as UserIcon, CheckCircle, Camera, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getDb } from '../lib/db';
 import { geminiKeyManager } from '../lib/geminiKeyManager';
 import { Medicine } from '../types';
 import { CameraScanner } from './CameraScanner';
 import { Modal } from './Modal';
+import { triggerToast } from '../lib/toast';
 
 interface CartItem {
   medicine: Medicine;
@@ -545,7 +547,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
 
   const handleShowAlternatives = async (med: Medicine) => {
     if (!med.scientific_name) {
-      alert("هذا الدواء لا يحتوي على اسم علمي مسجل للبحث عن بدائل.");
+      triggerToast("هذا الدواء لا يحتوي على اسم علمي مسجل للبحث عن بدائل.", "warning");
       return;
     }
     try {
@@ -788,6 +790,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
     }
 
     setIsSuccess(true);
+    triggerToast("تمت عملية البيع وحفظ الفاتورة بنجاح!", "success");
     setCart([]);
     setCustomerName("");
     setDiscount(0);
@@ -829,14 +832,14 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
   return (
     <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '32px', height: 'calc(100vh - 120px)' }}>
       {/* Left Column: Search and Product Selection */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', minHeight: 0 }}>
         <div className="card" style={{ padding: '32px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <h2 style={{ margin: 0, fontWeight: 800 }}>نقطة البيع</h2>
             {(cart.length > 1 || (cart.length === 1 && patientCondition !== 'none')) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 {isCheckingDDI ? (
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: '#f1f5f9', borderRadius: '20px' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px', background: 'var(--bg)', borderRadius: '20px' }}>
                     <span style={{ border: '2px solid #e2e8f0', borderTop: '2px solid var(--primary)', borderRadius: '50%', width: '13px', height: '13px', display: 'inline-block', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
                     جاري الفحص...
                   </span>
@@ -846,7 +849,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
                     borderRadius: '20px',
                     fontSize: '0.8rem',
                     fontWeight: 700,
-                    background: ddiResult.severity === 'critical' ? '#fee2e2' : ddiResult.severity === 'warning' ? '#fef9c3' : '#dcfce7',
+                    background: ddiResult.severity === 'critical' ? 'var(--error-container)' : ddiResult.severity === 'warning' ? 'var(--warning-container)' : '#dcfce7',
                     color: ddiResult.severity === 'critical' ? '#dc2626' : ddiResult.severity === 'warning' ? '#ca8a04' : '#15803d',
                     display: 'flex',
                     alignItems: 'center',
@@ -896,7 +899,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
               ref={searchInputRef}
               className="search-input" 
               placeholder="ابحث عن الدواء بالاسم أو الباركود..." 
-              style={{ width: '100%', paddingRight: '44px', height: '56px', fontSize: '1rem', background: '#f2f4f6' }}
+              style={{ width: '100%', paddingRight: '44px', height: '56px', fontSize: '1rem', background: 'var(--bg)' }}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -963,7 +966,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    background: '#f8fafc',
+                    background: 'var(--tab-bg)',
                     border: '1px solid #e2e8f0',
                     borderRadius: '12px',
                     transition: 'all 0.2s',
@@ -1014,7 +1017,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
             </label>
             <select 
               className="input" 
-              style={{ flex: 1, borderRadius: '12px', background: '#f2f4f6', border: 'none', height: '48px', fontWeight: 700, direction: 'rtl', paddingRight: '12px', margin: 0 }}
+              style={{ flex: 1, borderRadius: '12px', background: 'var(--bg)', border: 'none', height: '48px', fontWeight: 700, direction: 'rtl', paddingRight: '12px', margin: 0 }}
               value={patientCondition}
               onChange={(e) => setPatientCondition(e.target.value)}
             >
@@ -1035,7 +1038,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
         {(cart.length > 1 || (cart.length === 1 && patientCondition !== 'none')) && ddiResult && (
           <div className="card fade-in" style={{ 
             padding: '20px', 
-            background: ddiResult.severity === 'critical' ? '#fff5f5' : ddiResult.severity === 'warning' ? '#fefbeb' : '#f0fdf4',
+            background: ddiResult.severity === 'critical' ? 'var(--error-container)' : ddiResult.severity === 'warning' ? 'var(--warning-container)' : '#f0fdf4',
             border: `1px solid ${ddiResult.severity === 'critical' ? '#fee2e2' : ddiResult.severity === 'warning' ? '#fef9c3' : '#dcfce7'}`,
             borderRadius: '16px',
             display: 'flex',
@@ -1118,120 +1121,128 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
                 </tr>
               </thead>
               <tbody>
-                {cart.map(item => (
-                  <tr key={item.medicine.id}>
-                    <td>
-                      <div style={{ fontWeight: 700 }}>{item.medicine.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-slate)' }}>{item.medicine.barcode}</div>
-                    </td>
-                    <td>{item.medicine.price.toFixed(2)}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <AnimatePresence initial={false}>
+                  {cart.map(item => (
+                    <motion.tr 
+                      key={item.medicine.id}
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20, transition: { duration: 0.15 } }}
+                      transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                    >
+                      <td>
+                        <div style={{ fontWeight: 700 }}>{item.medicine.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-slate)' }}>{item.medicine.barcode}</div>
+                      </td>
+                      <td>{item.medicine.price.toFixed(2)}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                          <button 
+                            className="btn-icon" 
+                            style={{ 
+                              width: '36px', 
+                              height: '36px', 
+                              background: 'var(--bg)', 
+                              borderRadius: '50%',
+                              color: 'var(--text-slate)',
+                              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                              border: '1px solid #e2e8f0'
+                            }} 
+                            onClick={() => updateQuantity(item.medicine.id, -1)}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.background = '#e2e8f0';
+                              e.currentTarget.style.transform = 'scale(1.05)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.background = 'var(--bg)';
+                              e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                          >
+                            <Minus size={16} strokeWidth={3} />
+                          </button>
+                          
+                          <span style={{ 
+                            fontWeight: 900, 
+                            fontSize: '1.1rem',
+                            minWidth: '24px',
+                            textAlign: 'center',
+                            color: 'var(--text-main)',
+                            fontFamily: 'monospace'
+                          }}>
+                            {item.quantity}
+                          </span>
+                          
+                          <button 
+                            className="btn-icon" 
+                            style={{ 
+                              width: '36px', 
+                              height: '36px', 
+                              background: 'var(--primary)', 
+                              borderRadius: '50%', 
+                              color: 'white',
+                              border: 'none',
+                              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                            }} 
+                            onClick={() => updateQuantity(item.medicine.id, 1)}
+                            onMouseOver={(e) => {
+                              e.currentTarget.style.transform = 'scale(1.1)';
+                              e.currentTarget.style.opacity = '0.9';
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.opacity = '1';
+                            }}
+                          >
+                            <Plus size={16} strokeWidth={3} />
+                          </button>
+                        </div>
+                      </td>
+                      <td style={{ fontWeight: 800, color: 'var(--primary)', textAlign: 'left' }}>
+                        <div>{(item.lineTotal ?? 0).toLocaleString()} د.ع</div>
+                        {item.quantity > 1 && (item.lineTotal / item.quantity).toFixed(0) !== (item.medicine.price ?? 0).toString() && (
+                          <div style={{ fontSize: '0.65rem', color: 'var(--secondary)', opacity: 0.8 }}>* سعر مختلط (وجبات متعددة)</div>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'left' }}>
                         <button 
                           className="btn-icon" 
                           style={{ 
-                            width: '36px', 
-                            height: '36px', 
-                            background: '#f1f5f9', 
-                            borderRadius: '50%',
-                            color: 'var(--text-slate)',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                            border: '1px solid #e2e8f0'
+                            color: '#ef4444', 
+                            background: 'rgba(239, 68, 68, 0.08)', 
+                            border: 'none',
+                            borderRadius: '12px',
+                            width: '36px',
+                            height: '36px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            marginRight: 'auto'
                           }} 
-                          onClick={() => updateQuantity(item.medicine.id, -1)}
+                          onClick={() => removeFromCart(item.medicine.id)}
                           onMouseOver={(e) => {
-                            e.currentTarget.style.background = '#e2e8f0';
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.16)';
                             e.currentTarget.style.transform = 'scale(1.05)';
                           }}
                           onMouseOut={(e) => {
-                            e.currentTarget.style.background = '#f1f5f9';
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
                             e.currentTarget.style.transform = 'scale(1)';
                           }}
                         >
-                          <Minus size={16} strokeWidth={3} />
+                          <Trash2 size={16} />
                         </button>
-                        
-                        <span style={{ 
-                          fontWeight: 900, 
-                          fontSize: '1.1rem',
-                          minWidth: '24px',
-                          textAlign: 'center',
-                          color: 'var(--text-main)',
-                          fontFamily: 'monospace' // For stable width
-                        }}>
-                          {item.quantity}
-                        </span>
-                        
-                        <button 
-                          className="btn-icon" 
-                          style={{ 
-                            width: '36px', 
-                            height: '36px', 
-                            background: 'var(--primary)', 
-                            borderRadius: '50%', 
-                            color: 'white',
-                            border: 'none',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                          }} 
-                          onClick={() => updateQuantity(item.medicine.id, 1)}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.1)';
-                            e.currentTarget.style.opacity = '0.9';
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.opacity = '1';
-                          }}
-                        >
-                          <Plus size={16} strokeWidth={3} />
-                        </button>
-                      </div>
-                    </td>
-                    <td style={{ fontWeight: 800, color: 'var(--primary)', textAlign: 'left' }}>
-                      <div>{(item.lineTotal ?? 0).toLocaleString()} د.ع</div>
-                      {item.quantity > 1 && (item.lineTotal / item.quantity).toFixed(0) !== (item.medicine.price ?? 0).toString() && (
-                        <div style={{ fontSize: '0.65rem', color: 'var(--secondary)', opacity: 0.8 }}>* سعر مختلط (وجبات متعددة)</div>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'left' }}>
-                      <button 
-                        className="btn-icon" 
-                        style={{ 
-                          color: '#ef4444', 
-                          background: 'rgba(239, 68, 68, 0.08)', 
-                          border: 'none',
-                          borderRadius: '12px',
-                          width: '36px',
-                          height: '36px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          marginRight: 'auto'
-                        }} 
-                        onClick={() => removeFromCart(item.medicine.id)}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.16)';
-                          e.currentTarget.style.transform = 'scale(1.05)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                          e.currentTarget.style.transform = 'scale(1)';
-                        }}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
               </tbody>
             </table>
           )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', minHeight: 0, overflowY: 'auto', paddingLeft: '6px' }}>
         <div className="card" style={{ flex: 1, background: 'var(--primary)', color: 'white', display: 'flex', flexDirection: 'column' }}>
           <h3 style={{ marginBottom: '32px', fontWeight: 800 }}>ملخص الفاتورة</h3>
           <div style={{ flex: 1 }}>
@@ -1366,7 +1377,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <select 
               className="input" 
-              style={{ flex: 1, borderRadius: '12px', background: '#f2f4f6', border: 'none', height: '48px' }}
+              style={{ flex: 1, borderRadius: '12px', background: 'var(--bg)', border: 'none', height: '48px' }}
               value={selectedCustomerId || ""}
               onChange={(e) => {
                 const id = parseInt(e.target.value);
@@ -1384,12 +1395,12 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
           <input 
             className="input" 
             placeholder="اسم العميل (نقدي)..." 
-            style={{ width: '100%', borderRadius: '12px', background: '#f2f4f6', border: 'none', height: '48px', marginBottom: '16px' }}
+            style={{ width: '100%', borderRadius: '12px', background: 'var(--bg)', border: 'none', height: '48px', marginBottom: '16px' }}
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
           />
           
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', background: '#f1f5f9', padding: '12px', borderRadius: '12px', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', background: 'var(--tab-bg)', padding: '12px', borderRadius: '12px', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontWeight: 800, fontSize: '0.9rem', color: paymentMethod === 'credit' ? 'var(--secondary)' : 'var(--primary)' }}>
               {paymentMethod === 'credit' ? '📦 طريقة الدفع: آجل (Credit)' : '💵 طريقة الدفع: نقدي (Cash)'}
             </span>
@@ -1401,7 +1412,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
           <input 
             type="number"
             className="input" 
-            style={{ width: '100%', borderRadius: '12px', background: '#f2f4f6', border: 'none', height: '48px', marginBottom: '16px' }}
+            style={{ width: '100%', borderRadius: '12px', background: 'var(--bg)', border: 'none', height: '48px', marginBottom: '16px' }}
             value={amountPaid}
             onChange={(e) => setAmountPaid(parseFloat(e.target.value) || 0)}
           />
@@ -1457,7 +1468,7 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
                 </div>
               ))}
               {alternativesList.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-slate)', background: '#f8fafc', borderRadius: '16px', border: '1px dashed var(--border)' }}>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-slate)', background: 'var(--bg)', borderRadius: '16px', border: '1px dashed var(--border)' }}>
                   لا توجد بدائل علمية أخرى متوفرة في المخزن حالياً لهذا الاسم العلمي.
                 </div>
               )}
@@ -1478,8 +1489,8 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
               width: '64px',
               height: '64px',
               borderRadius: '50%',
-              background: ddiResult.severity === 'critical' ? '#fee2e2' : '#fef9c3',
-              color: ddiResult.severity === 'critical' ? '#dc2626' : '#ca8a04',
+              background: ddiResult.severity === 'critical' ? 'var(--error-container)' : 'var(--warning-container)',
+              color: ddiResult.severity === 'critical' ? 'var(--error)' : 'var(--warning)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1490,24 +1501,24 @@ Do not include any markdown format tags like \`\`\`json. Output raw JSON.`;
 
             {ddiResult.has_interaction ? (
               <div style={{ display: 'grid', gap: '20px', textAlign: 'right', marginBottom: '32px' }}>
-                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <div style={{ background: 'var(--bg)', padding: '16px', borderRadius: '12px', border: '1.5px solid var(--border-color)' }}>
                   <h4 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-main)', marginBottom: '8px' }}>🔍 1. الأدوية المتعارضة علمياً:</h4>
-                  <div style={{ fontSize: '0.9rem', color: '#1e293b', fontWeight: 700, paddingRight: '8px' }}>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-slate)', fontWeight: 700, paddingRight: '8px' }}>
                     {ddiResult.conflicting_drugs}
                   </div>
                 </div>
 
-                <div style={{ background: '#fff5f5', padding: '16px', borderRadius: '12px', border: '1px solid #fee2e2' }}>
-                  <h4 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#991b1b', marginBottom: '8px' }}>❌ 2. الأضرار والخطورة على المريض:</h4>
-                  <div style={{ fontSize: '0.9rem', color: '#dc2626', fontWeight: 600, paddingRight: '8px', lineHeight: '1.6' }}>
+                <div style={{ background: 'var(--error-container)', padding: '16px', borderRadius: '12px', border: '1.5px solid var(--border-color)' }}>
+                  <h4 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--error)', marginBottom: '8px' }}>❌ 2. الأضرار والخطورة على المريض:</h4>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--error)', fontWeight: 600, paddingRight: '8px', lineHeight: '1.6' }}>
                     {ddiResult.risks}
                   </div>
                 </div>
 
                 {ddiResult.recommended_alternatives && (
-                  <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '12px', border: '1px solid #dcfce7' }}>
-                    <h4 style={{ fontWeight: 800, fontSize: '0.95rem', color: '#166534', marginBottom: '8px' }}>✅ 3. البدائل الآمنة المقترحة (المتوفرة بمخزنك):</h4>
-                    <div style={{ fontSize: '0.9rem', color: '#15803d', fontWeight: 600, paddingRight: '8px', whiteSpace: 'pre-line', lineHeight: '1.6' }}>
+                  <div style={{ background: 'var(--success-container)', padding: '16px', borderRadius: '12px', border: '1.5px solid var(--border-color)' }}>
+                    <h4 style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--success)', marginBottom: '8px' }}>✅ 3. البدائل الآمنة المقترحة (المتوفرة بمخزنك):</h4>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--success)', fontWeight: 600, paddingRight: '8px', whiteSpace: 'pre-line', lineHeight: '1.6' }}>
                       {ddiResult.recommended_alternatives}
                     </div>
                   </div>

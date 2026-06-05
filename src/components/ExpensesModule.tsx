@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { triggerToast } from '../lib/toast';
 import { Plus, Trash2 } from 'lucide-react';
 import { getDb } from '../lib/db';
 import { Modal } from './Modal';
@@ -25,27 +26,30 @@ export const ExpensesModule = () => {
       "INSERT INTO expenses (category, amount, description) VALUES ($1, $2, $3)",
       [formData.category, formData.amount, formData.description]
     );
+    triggerToast("تم تسجيل المصروف بنجاح!", "success");
     setIsModalOpen(false);
     setFormData({ category: "Rent", amount: 0, description: "" });
     fetchExpenses();
   };
 
   const deleteExpense = async (id: number) => {
-    if (!confirm("هل أنت متأكد من حذف هذا المصروف؟")) return;
+    const confirmed = await (window as any).confirmDialog("هل أنت متأكد من حذف هذا المصروف؟");
+    if (!confirmed) return;
     const db = await getDb();
     await db.execute("DELETE FROM expenses WHERE id = $1", [id]);
+    triggerToast("تم حذف المصروف بنجاح!", "success");
     fetchExpenses();
   };
 
   return (
     <div className="fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
         <div>
           <h3 style={{ fontSize: '1.5rem', fontWeight: 800 }}>المصاريف التشغيلية</h3>
           <p style={{ color: 'var(--text-muted)' }}>تتبع تكاليف التشغيل، الإيجارات، والرواتب</p>
         </div>
         <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={20} /> إضافة مصروف جديد
+          <Plus size={18} /> إضافة مصروف جديد
         </button>
       </div>
 

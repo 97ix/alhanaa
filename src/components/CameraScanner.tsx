@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Camera, X } from 'lucide-react';
+import { triggerToast } from '../lib/toast';
 
 declare global {
   interface Window {
@@ -18,13 +19,13 @@ export const CameraScanner = ({ onScan, onClose }: CameraScannerProps) => {
   useEffect(() => {
     // Check if library is loaded
     if (!window.Html5Qrcode) {
-      alert("خطأ: لم يتم تحميل مكتبة قارئ الباركود. يرجى إعادة تشغيل التطبيق.");
+      triggerToast("خطأ: لم يتم تحميل مكتبة قارئ الباركود. يرجى إعادة تشغيل التطبيق.", "error");
       return;
     }
 
     // Check for camera support
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert("خطأ: متصفحك أو جهازك لا يدعم الوصول للكاميرا.");
+      triggerToast("خطأ: متصفحك أو جهازك لا يدعم الوصول للكاميرا.", "error");
       return;
     }
 

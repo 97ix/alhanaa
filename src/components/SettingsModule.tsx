@@ -133,7 +133,8 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
       return;
     }
 
-    if (!confirm(`هل أنت متأكد من حذف المستخدم "${userToDelete.name}" نهائياً؟`)) return;
+    const confirmed = await (window as any).confirmDialog(`هل أنت متأكد من حذف المستخدم "${userToDelete.name}" نهائياً؟`);
+    if (!confirmed) return;
 
     const db = await getDb();
     try {
@@ -566,7 +567,7 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
           <div className="card" style={{
             maxWidth: '450px',
             width: '100%',
-            background: 'white',
+            background: 'var(--card-bg)',
             borderRadius: '16px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             padding: '32px',
@@ -647,9 +648,9 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
                 style={{
                   height: '44px',
                   justifyContent: 'center',
-                  background: 'white',
-                  border: '1px solid #d1d5db',
-                  color: '#374151',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-main)',
                   fontWeight: 700
                 }}
                 onClick={() => setIsResetModalOpen(false)}
@@ -679,12 +680,12 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
           <div className="card" style={{
             maxWidth: '450px',
             width: '100%',
-            background: 'white',
+            background: 'var(--card-bg)',
             borderRadius: '16px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             padding: '32px',
             textAlign: 'center',
-            border: '1px solid #e5e7eb'
+            border: '1px solid var(--border-color)'
           }}>
             <div style={{
               width: '56px',
@@ -725,9 +726,9 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
                 style={{
                   height: '44px',
                   justifyContent: 'center',
-                  background: 'white',
-                  border: '1px solid #d1d5db',
-                  color: '#374151',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-main)',
                   fontWeight: 700
                 }}
                 onClick={() => setIsRestoreModalOpen(false)}

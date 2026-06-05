@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { triggerToast } from '../lib/toast';
 import { Search, Plus, Phone, Mail, Calendar, Edit2, Trash2 } from 'lucide-react';
 import { getDb } from '../lib/db';
 import { Customer } from '../types';
@@ -47,6 +48,7 @@ export const CustomersModule = ({ initialSearch = "", currentUser }: { initialSe
         [formData.name, formData.phone, formData.email]
       );
     }
+    triggerToast(editingCustomer ? "تم تحديث بيانات المريض بنجاح!" : "تم إضافة المريض الجديد بنجاح!", "success");
     setIsModalOpen(false);
     setEditingCustomer(null);
     setFormData({ name: "", phone: "", email: "" });
@@ -68,7 +70,7 @@ export const CustomersModule = ({ initialSearch = "", currentUser }: { initialSe
     setSelectedCustomer(null);
     setPaymentAmount(0);
     fetchCustomers();
-    alert("تم تسجيل التسديد وتحديث الرصيد بنجاح");
+    triggerToast("تم تسجيل التسديد وتحديث الرصيد بنجاح", "success");
   };
 
   const viewHistory = async (customer: Customer) => {
@@ -106,13 +108,13 @@ export const CustomersModule = ({ initialSearch = "", currentUser }: { initialSe
 
   return (
     <div className="fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>سجل المرضى</h2>
           <p style={{ color: 'var(--text-muted)' }}>إدارة ملفات المرضى وتاريخهم الطبي</p>
         </div>
         <button className="btn btn-primary" onClick={() => { setEditingCustomer(null); setFormData({ name: "", phone: "", email: "" }); setIsModalOpen(true); }}>
-          <Plus size={20} /> إضافة مريض جديد
+          <Plus size={18} /> إضافة مريض جديد
         </button>
       </div>
 
@@ -397,12 +399,12 @@ export const CustomersModule = ({ initialSearch = "", currentUser }: { initialSe
                     await db.execute("DELETE FROM customer_transactions WHERE customer_id = $1", [customerToDelete.id]);
                     // Delete the customer record itself
                     await db.execute("DELETE FROM customers WHERE id = $1", [customerToDelete.id]);
-                    
+                    triggerToast("تم حذف المريض بنجاح!", "success");
                     setCustomerToDelete(null);
                     fetchCustomers();
                   } catch (error: any) {
                     console.error("Error deleting customer:", error);
-                    alert("حدث خطأ أثناء حذف المريض: " + (error.message || error));
+                    triggerToast("حدث خطأ أثناء حذف المريض: " + (error.message || error), "error");
                   }
                 }}
               >

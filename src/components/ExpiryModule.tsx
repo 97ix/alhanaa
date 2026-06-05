@@ -120,68 +120,68 @@ export const ExpiryModule = () => {
       <section className="dashboard-grid" style={{ marginBottom: '32px' }}>
         <div 
           className={`metric-card ${filter === 'expired' ? 'active' : ''}`}
-          style={{ cursor: 'pointer', border: filter === 'expired' ? '2px solid #ef4444' : '1px solid var(--border)', background: '#fff5f5' }}
+          style={{ cursor: 'pointer', border: filter === 'expired' ? '2px solid var(--error)' : '1px solid var(--border)', background: 'var(--error-container)' }}
           onClick={() => setFilter('expired')}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="metric-icon-box" style={{ background: '#fee2e2', color: '#dc2626' }}>
+            <div className="metric-icon-box" style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--error)' }}>
               <ShieldAlert size={24} />
             </div>
             <span className="badge badge-error">منتهية</span>
           </div>
           <div>
-            <p className="val-label" style={{ color: '#991b1b' }}>منتهية الصلاحية</p>
-            <h3 className="val-amount" style={{ color: '#dc2626' }}>{expiredCount} <span style={{ fontSize: '1rem', fontWeight: 500 }}>وجبة</span></h3>
+            <p className="val-label" style={{ color: 'var(--error)' }}>منتهية الصلاحية</p>
+            <h3 className="val-amount" style={{ color: 'var(--error)' }}>{expiredCount} <span style={{ fontSize: '1rem', fontWeight: 500 }}>وجبة</span></h3>
           </div>
         </div>
 
         <div 
           className={`metric-card ${filter === 'critical' ? 'active' : ''}`}
-          style={{ cursor: 'pointer', border: filter === 'critical' ? '2px solid #f97316' : '1px solid var(--border)', background: '#fff7ed' }}
+          style={{ cursor: 'pointer', border: filter === 'critical' ? '2px solid var(--warning)' : '1px solid var(--border)', background: 'var(--warning-container)' }}
           onClick={() => setFilter('critical')}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="metric-icon-box" style={{ background: '#ffedd5', color: '#ea580c' }}>
+            <div className="metric-icon-box" style={{ background: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)' }}>
               <AlertTriangle size={24} />
             </div>
-            <span className="badge" style={{ background: '#ffedd5', color: '#ea580c' }}>&lt; 90 يوم</span>
+            <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: 'var(--warning)' }}>&lt; 90 يوم</span>
           </div>
           <div>
-            <p className="val-label" style={{ color: '#9a3412' }}>حرجة (قريبة جداً)</p>
-            <h3 className="val-amount" style={{ color: '#ea580c' }}>{criticalCount} <span style={{ fontSize: '1rem', fontWeight: 500 }}>وجبة</span></h3>
+            <p className="val-label" style={{ color: 'var(--warning)' }}>حرجة (قريبة جداً)</p>
+            <h3 className="val-amount" style={{ color: 'var(--warning)' }}>{criticalCount} <span style={{ fontSize: '1rem', fontWeight: 500 }}>وجبة</span></h3>
           </div>
         </div>
 
         <div 
           className={`metric-card ${filter === 'warning' ? 'active' : ''}`}
-          style={{ cursor: 'pointer', border: filter === 'warning' ? '2px solid #eab308' : '1px solid var(--border)', background: '#fefbeb' }}
+          style={{ cursor: 'pointer', border: filter === 'warning' ? '2px solid var(--warning)' : '1px solid var(--border)', background: 'var(--warning-container)' }}
           onClick={() => setFilter('warning')}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="metric-icon-box" style={{ background: '#fef9c3', color: '#ca8a04' }}>
+            <div className="metric-icon-box" style={{ background: 'rgba(234, 179, 8, 0.15)', color: 'var(--warning)' }}>
               <Calendar size={24} />
             </div>
-            <span className="badge" style={{ background: '#fef9c3', color: '#ca8a04' }}>&lt; 180 يوم</span>
+            <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: 'var(--warning)' }}>&lt; 180 يوم</span>
           </div>
           <div>
-            <p className="val-label" style={{ color: '#854d0e' }}>تنبيه صلاحية</p>
-            <h3 className="val-amount" style={{ color: '#ca8a04' }}>{warningCount} <span style={{ fontSize: '1rem', fontWeight: 500 }}>وجبة</span></h3>
+            <p className="val-label" style={{ color: 'var(--warning)' }}>تنبيه صلاحية</p>
+            <h3 className="val-amount" style={{ color: 'var(--warning)' }}>{warningCount} <span style={{ fontSize: '1rem', fontWeight: 500 }}>وجبة</span></h3>
           </div>
         </div>
 
         <div 
           className={`metric-card ${filter === 'safe' ? 'active' : ''}`}
-          style={{ cursor: 'pointer', border: filter === 'safe' ? '2px solid var(--primary)' : '1px solid var(--border)', background: '#f0fdf4' }}
+          style={{ cursor: 'pointer', border: filter === 'safe' ? '2px solid var(--primary)' : '1px solid var(--border)', background: 'var(--success-container)' }}
           onClick={() => setFilter('safe')}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div className="metric-icon-box" style={{ background: '#dcfce7', color: 'var(--primary)' }}>
+            <div className="metric-icon-box" style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--primary)' }}>
               <CheckCircle size={24} />
             </div>
             <span className="badge badge-primary">آمنة</span>
           </div>
           <div>
-            <p className="val-label" style={{ color: '#166534' }}>وجبات صالحة وآمنة</p>
+            <p className="val-label" style={{ color: 'var(--primary)' }}>وجبات صالحة وآمنة</p>
             <h3 className="val-amount" style={{ color: 'var(--primary)' }}>{safeCount} <span style={{ fontSize: '1rem', fontWeight: 500 }}>وجبة</span></h3>
           </div>
         </div>
@@ -192,7 +192,7 @@ export const ExpiryModule = () => {
         <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'flex-start' }}>
           <button 
             className="btn" 
-            style={{ padding: '6px 12px', fontSize: '0.85rem', background: '#f2f4f6' }}
+            style={{ padding: '6px 12px', fontSize: '0.85rem', background: 'var(--bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}
             onClick={() => setFilter('all')}
           >
             عرض جميع الوجبات ({batches.length})
@@ -204,20 +204,20 @@ export const ExpiryModule = () => {
       <div className="table-container">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ background: '#f8fafc' }}>
-              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>اسم الدواء</th>
-              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الاسم العلمي</th>
-              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الفئة</th>
-              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>الكمية بالوجبة</th>
-              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>تاريخ انتهاء الصلاحية</th>
-              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>الأيام المتبقية</th>
-              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>الحالة</th>
-              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center', width: '100px' }}>خيارات</th>
+            <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border-color)' }}>
+              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>اسم الدواء</th>
+              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>الاسم العلمي</th>
+              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>الفئة</th>
+              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>الكمية بالوجبة</th>
+              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>تاريخ انتهاء الصلاحية</th>
+              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>الأيام المتبقية</th>
+              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>الحالة</th>
+              <th style={{ padding: '16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center', width: '100px' }}>خيارات</th>
             </tr>
           </thead>
           <tbody>
             {filteredBatches.map(b => (
-              <tr key={b.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+              <tr key={b.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                 <td style={{ padding: '16px', fontSize: '0.9rem', fontWeight: 800 }}>{b.medicine_name}</td>
                 <td style={{ padding: '16px', fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600 }}>{b.scientific_name || '-'}</td>
                 <td style={{ padding: '16px', fontSize: '0.85rem' }}>{b.category_name || '-'}</td>
@@ -238,8 +238,8 @@ export const ExpiryModule = () => {
                     b.status === 'critical' ? 'badge-secondary' :
                     b.status === 'warning' ? 'badge-primary' : 'badge-success'
                   }`} style={{
-                    background: b.status === 'critical' ? '#ffedd5' : b.status === 'warning' ? '#fef9c3' : undefined,
-                    color: b.status === 'critical' ? '#ea580c' : b.status === 'warning' ? '#ca8a04' : undefined,
+                    background: b.status === 'critical' ? 'var(--warning-container)' : b.status === 'warning' ? 'var(--warning-container)' : undefined,
+                    color: b.status === 'critical' ? 'var(--warning)' : b.status === 'warning' ? 'var(--warning)' : undefined,
                   }}>
                     {b.status === 'expired' ? 'منتهي الصلاحية' :
                      b.status === 'critical' ? 'حرج جداً' :
@@ -291,7 +291,7 @@ export const ExpiryModule = () => {
           title="تسجيل إتلاف واستبعاد وجبة دواء"
         >
           <form onSubmit={handleWriteoffSubmit} style={{ display: 'grid', gap: '20px' }}>
-            <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <div style={{ padding: '16px', background: 'var(--bg)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
               <div style={{ fontWeight: 800, fontSize: '1rem', marginBottom: '4px' }}>{selectedBatch.medicine_name}</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>الاسم العلمي: {selectedBatch.scientific_name || '-'}</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '8px' }}>
@@ -306,7 +306,7 @@ export const ExpiryModule = () => {
                 min="1"
                 max={selectedBatch.quantity}
                 className="input"
-                style={{ width: '100%', background: '#f2f4f6', border: 'none', height: '48px' }}
+                style={{ width: '100%', background: 'var(--bg)', border: 'none', height: '48px' }}
                 value={writeoffQty}
                 onChange={e => setWriteoffQty(Math.min(selectedBatch.quantity, Math.max(1, parseInt(e.target.value) || 0)))}
                 required
@@ -317,7 +317,7 @@ export const ExpiryModule = () => {
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: 700, fontSize: '0.9rem' }}>سبب الاستبعاد</label>
               <select
                 className="input"
-                style={{ width: '100%', height: '48px', background: '#f2f4f6', border: 'none' }}
+                style={{ width: '100%', height: '48px', background: 'var(--bg)', border: 'none' }}
                 value={writeoffReason}
                 onChange={e => setWriteoffReason(e.target.value)}
                 required
@@ -340,7 +340,7 @@ export const ExpiryModule = () => {
               <button 
                 type="button" 
                 className="btn" 
-                style={{ height: '48px', padding: '0 24px', background: '#f2f4f6', fontWeight: 700 }}
+                style={{ height: '48px', padding: '0 24px', background: 'var(--bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', fontWeight: 700 }}
                 onClick={() => {
                   setIsWriteoffOpen(false);
                   setSelectedBatch(null);

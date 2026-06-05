@@ -82,7 +82,7 @@ export const ReportsModule = () => {
         <button className="btn btn-primary" onClick={fetchSales}>تحديث البيانات</button>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', background: '#f1f5f9', padding: '6px', borderRadius: '16px', width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', background: 'var(--tab-bg)', padding: '6px', borderRadius: '16px', width: 'fit-content' }}>
         <button 
           onClick={() => setActiveTab('overview')}
           className={`btn ${activeTab === 'overview' ? 'btn-primary' : ''}`}
@@ -116,20 +116,20 @@ export const ReportsModule = () => {
                 {sales.reduce((sum, s) => sum + s.total_amount, 0).toLocaleString()} <span style={{ fontSize: '0.9rem' }}>د.ع</span>
               </h3>
             </div>
-            <div className="card" style={{ borderRight: '4px solid var(--secondary)', background: 'white' }}>
+            <div className="card" style={{ borderRight: '4px solid var(--secondary)', background: 'var(--card-bg)' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>صافي الربح التقديري</p>
               <h3 style={{ fontSize: '1.75rem', marginTop: '8px', fontWeight: 800, color: 'var(--secondary)' }}>
                 {(sales.reduce((sum, s) => sum + (s.profit || 0), 0) - totalExpenses).toLocaleString()} <span style={{ fontSize: '0.9rem' }}>د.ع</span>
               </h3>
               <p style={{ fontSize: '0.65rem', color: 'var(--error)', marginTop: '4px' }}>* بعد خصم {totalExpenses.toLocaleString()} مصاريف</p>
             </div>
-            <div className="card" style={{ background: 'white' }}>
+            <div className="card" style={{ background: 'var(--card-bg)' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>إجمالي المصاريف</p>
               <h3 style={{ fontSize: '1.75rem', marginTop: '8px', fontWeight: 800, color: 'var(--error)' }}>
                 {totalExpenses.toLocaleString()} <span style={{ fontSize: '0.9rem' }}>د.ع</span>
               </h3>
             </div>
-            <div className="card" style={{ background: 'white' }}>
+            <div className="card" style={{ background: 'var(--card-bg)' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>هامش الربح</p>
               <h3 style={{ fontSize: '1.75rem', marginTop: '8px', fontWeight: 800 }}>
                 {sales.reduce((sum, s) => sum + s.total_amount, 0) > 0 
