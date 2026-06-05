@@ -5,9 +5,6 @@ import {
   ShoppingCart, 
   Users, 
   Settings,
-  Bell,
-  Search,
-  HelpCircle,
   TrendingUp,
   AlertTriangle,
   UserPlus,
@@ -157,8 +154,8 @@ const Dashboard = ({ onNavigate }: { onNavigate: (tab: string, filter?: string) 
             <Package size={160} />
           </div>
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>المخزون الآلي</h3>
-            <p style={{ fontSize: '0.875rem', opacity: 0.9, lineHeight: 1.6 }}>حددت خوارزمية الدقة السريرية {stats.lowStockCount} عناصر تخصصية تتطلب إعادة الطلب للحفاظ على معدل تلبية بنسبة 99٪.</p>
+            <h3 className="text-white-force" style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>المخزون الآلي</h3>
+            <p className="text-white-force" style={{ fontSize: '0.875rem', opacity: 0.9, lineHeight: 1.6 }}>حددت خوارزمية الدقة السريرية {stats.lowStockCount} عناصر تخصصية تتطلب إعادة الطلب للحفاظ على معدل تلبية بنسبة 99٪.</p>
             <button className="btn" onClick={() => onNavigate('inventory', 'low_stock')} style={{ background: 'white', color: 'var(--primary)', width: '100%', marginTop: '32px', justifyContent: 'center' }}>مراجعة القائمة الذكية</button>
           </div>
         </div>
@@ -168,14 +165,21 @@ const Dashboard = ({ onNavigate }: { onNavigate: (tab: string, filter?: string) 
 };
 
 const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) => void }) => {
-  const [selectedUserId, setSelectedUserId] = useState<number>(users[0]?.id || 0);
+  // Find the admin user (صيدلي رئيسي) in the list to make them the default selection
+  const getInitialUserId = () => {
+    const admin = users.find(u => u.role === 'admin');
+    return admin ? admin.id : (users[0]?.id || 0);
+  };
+
+  const [selectedUserId, setSelectedUserId] = useState<number>(getInitialUserId());
   const [pin, setPin] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [shake, setShake] = useState(false);
 
   useEffect(() => {
-    if (users.length > 0 && !selectedUserId) {
-      setSelectedUserId(users[0].id);
+    if (users.length > 0) {
+      const admin = users.find(u => u.role === 'admin');
+      setSelectedUserId(admin ? admin.id : users[0].id);
     }
   }, [users]);
 
@@ -244,8 +248,8 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
       width: '100vw',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'radial-gradient(circle, #1e293b 0%, #0f172a 100%)',
-      color: 'white',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+      color: '#1e293b',
       fontFamily: 'var(--font-headline)',
       direction: 'rtl',
       position: 'fixed',
@@ -259,12 +263,11 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
         style={{
           width: '100%',
           maxWidth: '420px',
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          background: 'white',
+          border: '1px solid #e2e8f0',
           borderRadius: '28px',
           padding: '40px 32px',
-          backdropFilter: 'blur(20px)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center'
@@ -279,24 +282,24 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: '24px',
-          boxShadow: '0 0 20px rgba(13, 148, 136, 0.4)'
+          boxShadow: '0 0 20px rgba(13, 148, 136, 0.2)'
         }}>
           <KeyRound size={28} color="white" />
         </div>
 
-        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'white', marginBottom: '8px', textAlign: 'center' }}>صيدلية الهناء</h2>
-        <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '32px', textAlign: 'center' }}>يرجى اختيار المستخدم وإدخال رمز PIN للدخول</p>
+        <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1e293b', marginBottom: '8px', textAlign: 'center' }}>صيدلية الهناء</h2>
+        <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '32px', textAlign: 'center' }}>يرجى اختيار المستخدم وإدخال رمز PIN للدخول</p>
 
         <div style={{ width: '100%', marginBottom: '24px' }}>
-          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', marginBottom: '8px' }}>المستخدم</label>
+          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#64748b', marginBottom: '8px' }}>المستخدم</label>
           <select 
             style={{
               width: '100%',
               height: '50px',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              background: '#f1f5f9',
+              border: '1px solid #cbd5e1',
               borderRadius: '12px',
-              color: 'white',
+              color: '#1e293b',
               padding: '0 16px',
               fontWeight: 700,
               fontSize: '1rem',
@@ -311,7 +314,7 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
             }}
           >
             {users.map(u => (
-              <option key={u.id} value={u.id} style={{ background: '#0f172a', color: 'white' }}>
+              <option key={u.id} value={u.id} style={{ background: 'white', color: '#1e293b' }}>
                 {u.name} ({u.role === 'admin' ? 'صيدلي رئيسي' : 'مساعد صيدلي'})
               </option>
             ))}
@@ -324,7 +327,7 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
               width: '16px',
               height: '16px',
               borderRadius: '50%',
-              border: '2px solid rgba(255,255,255,0.2)',
+              border: '2px solid #cbd5e1',
               background: i < pin.length ? 'var(--primary)' : 'transparent',
               boxShadow: i < pin.length ? '0 0 8px var(--primary)' : 'none',
               transition: 'all 0.15s ease'
@@ -333,7 +336,7 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
         </div>
 
         {errorMsg && (
-          <p style={{ color: '#f87171', fontSize: '0.85rem', fontWeight: 700, marginBottom: '20px' }}>{errorMsg}</p>
+          <p style={{ color: '#ef4444', fontSize: '0.85rem', fontWeight: 700, marginBottom: '20px' }}>{errorMsg}</p>
         )}
 
         <div style={{
@@ -353,9 +356,9 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                color: 'white',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                color: '#1e293b',
                 fontSize: '1.25rem',
                 fontWeight: 700,
                 cursor: 'pointer',
@@ -365,8 +368,8 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
                 justifyContent: 'center',
                 margin: '0 auto'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+              onMouseLeave={(e) => e.currentTarget.style.background = '#f8fafc'}
             >
               {num}
             </button>
@@ -380,7 +383,7 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
               borderRadius: '50%',
               background: 'transparent',
               border: 'none',
-              color: '#94a3b8',
+              color: '#64748b',
               fontSize: '0.9rem',
               fontWeight: 700,
               cursor: 'pointer',
@@ -399,9 +402,9 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
               width: '64px',
               height: '64px',
               borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              color: 'white',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              color: '#1e293b',
               fontSize: '1.25rem',
               fontWeight: 700,
               cursor: 'pointer',
@@ -410,8 +413,8 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
               justifyContent: 'center',
               margin: '0 auto'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+            onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
+            onMouseLeave={(e) => e.currentTarget.style.background = '#f8fafc'}
           >
             0
           </button>
@@ -424,7 +427,7 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
               borderRadius: '50%',
               background: 'transparent',
               border: 'none',
-              color: '#94a3b8',
+              color: '#64748b',
               fontSize: '0.9rem',
               fontWeight: 700,
               cursor: 'pointer',
@@ -445,7 +448,7 @@ const LockScreen = ({ users, onUnlock }: { users: any[], onUnlock: (user: any) =
 function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [inventoryFilter, setInventoryFilter] = useState("");
-  const [globalSearch, setGlobalSearch] = useState("");
+  const globalSearch = "";
   const [posCart, setPosCart] = useState<any[]>([]);
   const [posCustomerName, setPosCustomerName] = useState("");
   const [dbReady, setDbReady] = useState(false);
@@ -475,31 +478,24 @@ function App() {
     }).catch(console.error);
   }, []);
 
+  // Block right-click globally in the application
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("contextmenu", handleContextMenu);
+    return () => {
+      window.removeEventListener("contextmenu", handleContextMenu);
+    };
+  }, []);
+
   const handleNavigate = (tab: string, filter?: string) => {
     setActiveTab(tab);
     if (filter) setInventoryFilter(filter);
     else setInventoryFilter("");
   };
 
-  const handleGlobalSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!globalSearch) return;
-    
-    const query = globalSearch.toLowerCase();
-    if (query.includes("مخزون") || query.includes("دواء") || query.includes("علاج")) {
-      setActiveTab("inventory");
-    } else if (query.includes("مريض") || query.includes("عميل")) {
-      setActiveTab("customers");
-    } else if (query.includes("مورد") || query.includes("مذخر")) {
-      setActiveTab("suppliers");
-    } else if (query.includes("تقرير") || query.includes("حساب")) {
-      setActiveTab("reports");
-    } else if (query.includes("طلب") || query.includes("بيع")) {
-      setActiveTab("pos");
-    } else {
-      setActiveTab("inventory");
-    }
-  };
+
 
   const renderContent = () => {
     switch(activeTab) {
@@ -601,26 +597,9 @@ function App() {
       </aside>
 
       <main className="main-content">
-        <header className="header">
-          <form className="search-container" onSubmit={handleGlobalSearch}>
-            <Search className="search-icon" size={18} />
-            <input 
-              className="search-input" 
-              placeholder="ابحث في النظام (أدوية، مرضى، فواتير...)" 
-              value={globalSearch}
-              onChange={(e) => setGlobalSearch(e.target.value)}
-            />
-          </form>
+        <header className="header" style={{ justifyContent: 'flex-end' }}>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button className="btn-icon" style={{ position: 'relative' }}>
-                <Bell size={20} color="var(--text-slate)" />
-                <span style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, background: 'var(--error)', borderRadius: '50%' }}></span>
-              </button>
-              <button className="btn-icon"><HelpCircle size={20} color="var(--text-slate)" /></button>
-            </div>
-            <div style={{ width: 1, height: 24, background: 'var(--outline-variant)', opacity: 0.3 }}></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ textAlign: 'left' }}>
                 <p style={{ fontSize: '0.8125rem', fontWeight: 700 }}>{currentUser.name}</p>

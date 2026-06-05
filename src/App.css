@@ -393,3 +393,8 @@ input::placeholder, textarea::placeholder {
 table {
   border: 1px solid var(--border);
 }
+
+.text-white-force {
+  color: white !important;
+}
+
