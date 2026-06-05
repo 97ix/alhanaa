@@ -57,6 +57,7 @@
   --radius-lg: 20px;
   --radius-xl: 28px;
   --tab-bg: #f1f5f9;
+  --recessed-bg: #e2e8f0;
   --login-bg-start: #f8fafc;
   --login-bg-end: #e2e8f0;
   --login-glass-border: rgba(255, 255, 255, 0.6);
@@ -86,6 +87,7 @@ body.dark {
   --success-container: #112e23; /* Deep solid green */
   --warning-container: #2c2312; /* Deep solid orange */
   --tab-bg: #111827; /* Recessed dark tab container background */
+  --recessed-bg: #080c14;
   --login-bg-start: #0b0f19;
   --login-bg-end: #05070b;
   --login-glass-border: rgba(255, 255, 255, 0.08);

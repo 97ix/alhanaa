@@ -957,7 +957,7 @@ Return JSON in this format:
             </div>
             <button 
               className="btn" 
-              style={{ background: '#f1f5f9', color: 'var(--text-slate)', fontSize: '0.85rem', padding: '8px 16px', borderRadius: '10px' }} 
+              style={{ background: 'var(--tab-bg)', color: 'var(--text-slate)', fontSize: '0.85rem', padding: '8px 16px', borderRadius: '10px' }} 
               onClick={addBlankExtractedItem}
             >
               + إضافة صف جديد
@@ -971,18 +971,18 @@ Return JSON in this format:
             </div>
           )}
 
-          <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '16px' }}>
+          <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '16px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
-              <thead style={{ background: '#f8fafc' }}>
+              <thead style={{ background: 'var(--bg)' }}>
                 <tr>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '130px' }}>الباركود</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>اسم الدواء (إنجليزي)</th>
-                  <th style={{ padding: '12px 6px', textAlign: 'center', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '60px' }}>الكمية</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '95px' }}>السعر الإجمالي (د.ع)</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '95px' }}>سعر الشراء للقطعة</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '140px' }}>تاريخ الصلاحية</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '130px' }}>سعر البيع المقدر</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem', color: '#475569', borderBottom: '1px solid #e2e8f0', width: '60px' }}>حذف</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: 'var(--text-slate)', borderBottom: '1px solid var(--border-color)', width: '130px' }}>الباركود</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: 'var(--text-slate)', borderBottom: '1px solid var(--border-color)' }}>اسم الدواء (إنجليزي)</th>
+                  <th style={{ padding: '12px 6px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-slate)', borderBottom: '1px solid var(--border-color)', width: '60px' }}>الكمية</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: 'var(--text-slate)', borderBottom: '1px solid var(--border-color)', width: '95px' }}>السعر الإجمالي (د.ع)</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: 'var(--text-slate)', borderBottom: '1px solid var(--border-color)', width: '95px' }}>سعر الشراء للقطعة</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: 'var(--text-slate)', borderBottom: '1px solid var(--border-color)', width: '140px' }}>تاريخ الصلاحية</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '0.85rem', color: 'var(--text-slate)', borderBottom: '1px solid var(--border-color)', width: '130px' }}>سعر البيع المقدر</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-slate)', borderBottom: '1px solid var(--border-color)', width: '60px' }}>حذف</th>
                 </tr>
               </thead>
               <tbody>
@@ -1880,10 +1880,10 @@ Return JSON in this format:
                     <tr style={{ background: 'var(--bg)' }}>
                       <td colSpan={8} style={{ padding: '20px 32px', borderBottom: '1px solid var(--border)' }}>
                         <div style={{ 
-                          background: 'var(--card-bg)', 
+                          background: 'var(--recessed-bg)', 
                           borderRadius: '16px', 
                           padding: '20px', 
-                          border: '1px solid var(--border)',
+                          border: '1.5px solid var(--border-color)',
                           boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)'
                         }}>
                           <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
@@ -1894,17 +1894,17 @@ Return JSON in this format:
                           ) : !medicineBatches[med.id] || medicineBatches[med.id].length === 0 ? (
                             <div style={{ padding: '10px', color: 'var(--text-slate)', fontSize: '0.85rem' }}>لا توجد وجبات مسجلة لهذا الدواء بعد.</div>
                           ) : (
-                            <table style={{ margin: 0, width: '100%', border: 'none' }}>
-                              <thead style={{ background: '#f1f5f9' }}>
+                            <table style={{ margin: 0, width: '100%', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', background: 'var(--card-bg)' }}>
+                              <thead style={{ background: 'var(--bg)' }}>
                                 <tr style={{ background: 'transparent' }}>
-                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الوجبة</th>
-                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>تاريخ الصلاحية</th>
-                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الكمية المتوفرة</th>
-                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>سعر الشراء للقطعة</th>
-                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>سعر البيع للوجبة</th>
-                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>تاريخ الإدخال</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>الوجبة</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>تاريخ الصلاحية</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>الكمية المتوفرة</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>سعر الشراء للقطعة</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>سعر البيع للوجبة</th>
+                                  <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>تاريخ الإدخال</th>
                                   {currentUser?.role === 'admin' && (
-                                    <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>إجراءات</th>
+                                    <th style={{ background: 'transparent', padding: '10px 16px', fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center' }}>إجراءات</th>
                                   )}
                                 </tr>
                               </thead>
@@ -1932,19 +1932,19 @@ Return JSON in this format:
 
                                   return (
                                     <tr key={batch.id} style={{ background: 'transparent', opacity: rowOpacity }}>
-                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', borderBottom: '1px solid #f1f5f9' }}>وجبة #{index + 1}</td>
-                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', borderBottom: '1px solid #f1f5f9' }}>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', borderBottom: '1px solid var(--border-color)' }}>وجبة #{index + 1}</td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', borderBottom: '1px solid var(--border-color)' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                           <span>{batch.expiry_date}</span>
                                           <span className={`badge ${badgeClass}`} style={{ fontSize: '9px', padding: '2px 8px' }}>{statusText}</span>
                                         </div>
                                       </td>
-                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', fontWeight: 800, borderBottom: '1px solid #f1f5f9' }}>{batch.quantity} قطعة</td>
-                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', borderBottom: '1px solid #f1f5f9' }}>{batch.purchase_price.toLocaleString()} د.ع</td>
-                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', borderBottom: '1px solid #f1f5f9' }}>{batch.selling_price.toLocaleString()} د.ع</td>
-                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', color: '#94a3b8', borderBottom: '1px solid #f1f5f9' }}>{new Date(batch.created_at).toLocaleDateString()}</td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', fontWeight: 800, borderBottom: '1px solid var(--border-color)' }}>{batch.quantity} قطعة</td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', borderBottom: '1px solid var(--border-color)' }}>{batch.purchase_price.toLocaleString()} د.ع</td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', fontWeight: 800, color: 'var(--primary)', borderBottom: '1px solid var(--border-color)' }}>{batch.selling_price.toLocaleString()} د.ع</td>
+                                      <td style={{ padding: '12px 16px', fontSize: '0.8rem', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)' }}>{new Date(batch.created_at).toLocaleDateString()}</td>
                                       {currentUser?.role === 'admin' && (
-                                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
+                                        <td style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color)', textAlign: 'center' }}>
                                           <button 
                                             type="button"
                                             className="btn" 
@@ -2234,11 +2234,11 @@ Return JSON in this format:
               </thead>
               <tbody>
                 {sciMeds.map((med, idx) => (
-                  <tr key={med.id} style={{ borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle' }}>
-                    <td style={{ padding: '12px 16px', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
+                  <tr key={med.id} style={{ borderBottom: '1px solid var(--border-color)', verticalAlign: 'middle' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
                       {med.name}
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: '0.8rem', color: '#64748b', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '12px 16px', fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {med.description || 'لا يوجد وصف'}
                     </td>
                     <td style={{ padding: '8px 16px' }}>

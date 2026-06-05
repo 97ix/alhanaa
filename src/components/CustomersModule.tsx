@@ -282,10 +282,10 @@ export const CustomersModule = ({ initialSearch = "", currentUser }: { initialSe
             <h4 style={{ fontSize: '0.9rem', fontWeight: 800, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               📜 الدفعات السابقة المستلمة
             </h4>
-            <div style={{ maxHeight: '180px', overflowY: 'auto', background: '#f8fafc', borderRadius: '12px', padding: '12px' }}>
+            <div style={{ maxHeight: '180px', overflowY: 'auto', background: 'var(--tab-bg)', borderRadius: '12px', padding: '12px' }}>
               <table style={{ margin: 0, fontSize: '0.8rem', width: '100%' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <th style={{ padding: '6px', textAlign: 'right' }}>التاريخ</th>
                     <th style={{ padding: '6px', textAlign: 'right' }}>المبلغ</th>
                     <th style={{ padding: '6px', textAlign: 'right' }}>التفاصيل</th>
@@ -294,7 +294,7 @@ export const CustomersModule = ({ initialSearch = "", currentUser }: { initialSe
                 <tbody>
                   {transactions.filter(t => t.type === 'payment').length > 0 ? (
                     transactions.filter(t => t.type === 'payment').map(t => (
-                      <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <tr key={t.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                         <td style={{ padding: '8px 6px' }}>{new Date(t.created_at).toLocaleDateString('ar-EG') || new Date(t.created_at).toLocaleDateString()}</td>
                         <td style={{ padding: '8px 6px', fontWeight: 700, color: 'var(--primary)' }}>
                           {t.amount.toLocaleString()} د.ع

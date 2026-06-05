@@ -69,7 +69,7 @@ export const ExpensesModule = () => {
               <tr key={exp.id}>
                 <td>{new Date(exp.created_at).toLocaleDateString()}</td>
                 <td>
-                  <span className="badge" style={{ background: '#f1f5f9', color: '#475569' }}>
+                  <span className="badge" style={{ background: 'var(--tab-bg)', color: 'var(--text-slate)' }}>
                     {exp.category === 'Rent' ? 'إيجار' : 
                      exp.category === 'Salary' ? 'رواتب' : 
                      exp.category === 'Bills' ? 'فواتير' : 'أخرى'}

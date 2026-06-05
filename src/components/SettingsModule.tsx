@@ -350,16 +350,16 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
 
           <table style={{ width: '100%', borderCollapse: 'collapse', margin: 0 }}>
             <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الاسم الكامل</th>
-                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>الدور الوظيفي</th>
-                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800 }}>رمز PIN</th>
-                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid #e2e8f0', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center', width: '120px' }}>خيارات</th>
+              <tr style={{ background: 'var(--bg)' }}>
+                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>الاسم الكامل</th>
+                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>الدور الوظيفي</th>
+                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800 }}>رمز PIN</th>
+                <th style={{ padding: '12px 16px', fontSize: '0.85rem', borderBottom: '1px solid var(--border-color)', color: 'var(--text-slate)', fontWeight: 800, textAlign: 'center', width: '120px' }}>خيارات</th>
               </tr>
             </thead>
             <tbody>
               {users.map(u => (
-                <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9', background: 'transparent' }}>
+                <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)', background: 'transparent' }}>
                   <td style={{ padding: '12px 16px', fontSize: '0.9rem', fontWeight: 700 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem' }}>
@@ -422,7 +422,7 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
           {/* Key Pool List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
             {geminiApiKeys.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', color: '#94a3b8', fontSize: '0.875rem' }}>
+              <div style={{ textAlign: 'center', padding: '24px', background: 'var(--bg)', borderRadius: '12px', border: '1px dashed var(--border-color)', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
                 لا توجد مفاتيح مضافة بعد. أضف مفتاحاً واحداً على الأقل لتفعيل الذكاء الاصطناعي.
               </div>
             )}
@@ -431,8 +431,8 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
                 display: 'flex',
                 alignItems: 'center',
                 gap: '12px',
-                background: idx === 0 ? 'rgba(13, 148, 136, 0.06)' : '#f8fafc',
-                border: idx === 0 ? '1px solid rgba(13, 148, 136, 0.3)' : '1px solid #e2e8f0',
+                background: idx === 0 ? 'var(--primary-glow)' : 'var(--bg)',
+                border: idx === 0 ? '1px solid var(--primary-light)' : '1px solid var(--border-color)',
                 borderRadius: '12px',
                 padding: '10px 16px'
               }}>
@@ -441,14 +441,14 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
                   minWidth: '28px',
                   height: '28px',
                   borderRadius: '8px',
-                  background: idx === 0 ? 'var(--primary)' : '#e2e8f0',
-                  color: idx === 0 ? 'white' : '#64748b',
+                  background: idx === 0 ? 'var(--primary)' : 'var(--border-color)',
+                  color: idx === 0 ? 'white' : 'var(--text-slate)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '0.75rem', fontWeight: 800
                 }}>{idx + 1}</span>
 
                 {/* Masked key */}
-                <span style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ flex: 1, fontFamily: 'monospace', fontSize: '0.85rem', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {key.slice(0, 8)}{'•'.repeat(Math.max(0, key.length - 12))}{key.slice(-4)}
                 </span>
 
@@ -487,7 +487,7 @@ export const SettingsModule = ({ currentUser, onUserUpdate }: { currentUser?: an
                 type="password"
                 placeholder="AIzaSy... (أدخل مفتاح Gemini API جديد)"
                 className="input"
-                style={{ flex: 1, background: '#f2f4f6', border: 'none', height: '48px', fontFamily: 'monospace' }}
+                style={{ flex: 1, background: 'var(--bg)', border: 'none', height: '48px', fontFamily: 'monospace' }}
                 value={newKeyInput}
                 onChange={e => setNewKeyInput(e.target.value)}
                 onKeyDown={e => {
